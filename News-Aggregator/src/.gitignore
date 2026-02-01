@@ -1,0 +1,21 @@
+## .NET build output
+bin/
+obj/
+out/
+
+## Rider / VS / VS Code
+.vs/
+.idea/
+*.user
+*.suo
+
+## Aspire / local dev
+**/appsettings.*.local.json
+*.received.*
+
+## User secrets are stored outside the repo by the SDK, but never commit keys.
+secrets.json
+
+## OS noise
+.DS_Store
+Thumbs.db
