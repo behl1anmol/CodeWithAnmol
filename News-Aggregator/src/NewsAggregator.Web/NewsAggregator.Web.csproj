@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <!--
+    Blazor Server UI AND the single DI composition root. Also hosts the Aspire
+    "ServiceDefaults" extension (Extensions/ServiceDefaultsExtensions.cs) to keep
+    the solution at five projects (docs §2 / §6).
+  -->
+  <PropertyGroup>
+    <RootNamespace>NewsAggregator.Web</RootNamespace>
+    <UserSecretsId>newsaggregator-web-9c1f0b1a</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NewsAggregator.Core\NewsAggregator.Core.csproj" />
+    <ProjectReference Include="..\NewsAggregator.Infrastructure\NewsAggregator.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Label="ServiceDefaults: discovery, resilience, telemetry">
+    <PackageReference Include="Microsoft.Extensions.ServiceDiscovery" />
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+    <PackageReference Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" />
+    <PackageReference Include="OpenTelemetry.Extensions.Hosting" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.AspNetCore" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Http" />
+    <PackageReference Include="OpenTelemetry.Instrumentation.Runtime" />
+  </ItemGroup>
+
+</Project>

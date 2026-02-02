@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Aspire app model host. The Aspire.AppHost.Sdk version is pinned in global.json. -->
+  <Sdk Name="Aspire.AppHost.Sdk" />
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsAspireHost>true</IsAspireHost>
+    <RootNamespace>NewsAggregator.AppHost</RootNamespace>
+    <UserSecretsId>newsaggregator-apphost-9c1f0b1a</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" />
+    <!-- P6: Ollama hosting integration (model bootstrap via AddModel). Client stays OllamaSharp. -->
+    <PackageReference Include="CommunityToolkit.Aspire.Hosting.Ollama" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NewsAggregator.Web\NewsAggregator.Web.csproj" IsAspireProjectResource="true" />
+  </ItemGroup>
+
+</Project>

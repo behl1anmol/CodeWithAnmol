@@ -1,0 +1,40 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    Adapters that implement Core ports against external SDKs. This is the ONLY
+    layer that references the Microsoft Agent Framework, Microsoft.Extensions.AI,
+    OllamaSharp and the OpenAI SDK. Versions come from Directory.Packages.props.
+  -->
+  <PropertyGroup>
+    <RootNamespace>NewsAggregator.Infrastructure</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NewsAggregator.Core\NewsAggregator.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup Label="AI / Agent Framework">
+    <PackageReference Include="Microsoft.Agents.AI" />
+    <PackageReference Include="Microsoft.Agents.AI.Workflows" />
+    <PackageReference Include="Microsoft.Agents.AI.OpenAI" />
+    <PackageReference Include="Microsoft.Extensions.AI" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" />
+    <PackageReference Include="OllamaSharp" />
+    <PackageReference Include="OpenAI" />
+  </ItemGroup>
+
+  <ItemGroup Label="Sources / caching / http">
+    <PackageReference Include="Microsoft.Extensions.Http" />
+    <!-- RemoveAllResilienceHandlers() opts the health-probe client out of the global
+         standard resilience handler so the probe is single-shot (no retry backoff). -->
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
+    <PackageReference Include="System.ServiceModel.Syndication" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" />
+    <PackageReference Include="Microsoft.Extensions.Caching.Memory" />
+  </ItemGroup>
+
+  <ItemGroup Label="Health checks">
+    <PackageReference Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!--
+    The Domain + Application layer.
+
+    INTENTIONALLY HAS ZERO PackageReferences. This enforces "no framework
+    coupling in the Domain" (docs §2.3 / §7.2-F). The dependency-rule test in
+    NewsAggregator.Tests fails the build if a framework assembly leaks in here.
+  -->
+  <PropertyGroup>
+    <RootNamespace>NewsAggregator.Core</RootNamespace>
+  </PropertyGroup>
+
+</Project>
