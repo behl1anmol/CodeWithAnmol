@@ -1,0 +1,152 @@
+@page "/digest"
+@rendermode InteractiveServer
+@implements IDisposable
+@using Microsoft.Extensions.Logging
+@using NewsAggregator.Core.Application
+@using NewsAggregator.Core.Application.Editorial
+@inject IDigestApplicationService DigestService
+@inject ILogger<NewsAggregator.Web.Components.Pages.Digest> Logger
+
+<PageTitle>Digest</PageTitle>
+
+<h1>Today's Digest</h1>
+
+<button class="btn" @onclick="RefreshAsync" disabled="@_busy">
+    @(_busy ? "Refreshing…" : "Refresh digest")
+</button>
+
+@if (_busy && _progress is not null)
+{
+    <p class="status">
+        @_progress.Stage@(_progress.TotalCount is int total && total > 0
+            ? $" {_progress.ProcessedCount ?? 0}/{total}"
+            : string.Empty)
+    </p>
+}
+
+@if (_status is not null)
+{
+    <p class="status">@_status</p>
+}
+
+@{
+    // Compute the filtered view once per render (top-level code block — the RZ1010 trap is
+    // only nested @{} inside an @if {} body). Null until the first refresh.
+    var view = _digest is null ? null : DigestFilter.Apply(_digest, _category, _tag);
+}
+
+@if (view is not null)
+{
+    <div class="filters">
+        <label>
+            Category:
+            <select @bind="_category">
+                <option value="">All categories</option>
+                @foreach (var category in DigestFilter.PresentCategories(_digest!))
+                {
+                    <option value="@category">@category</option>
+                }
+            </select>
+        </label>
+        <label>
+            Tag:
+            <select @bind="_tag">
+                <option value="">All tags</option>
+                @foreach (var tag in DigestFilter.DistinctTags(_digest!))
+                {
+                    <option value="@tag">@tag</option>
+                }
+            </select>
+        </label>
+    </div>
+
+    @if (view.Sections.Count == 0)
+    {
+        <p>No items match the current filter.</p>
+    }
+    else
+    {
+        @foreach (var section in view.Sections)
+        {
+            <section>
+                <h2>@section.Category</h2>
+                @if (!string.IsNullOrWhiteSpace(section.Intro))
+                {
+                    <p>@section.Intro</p>
+                }
+                <ul>
+                    @foreach (var item in section.Items)
+                    {
+                        <li>
+                            <a href="@item.Item.Url" target="_blank" rel="noopener noreferrer">@item.Item.Title</a>
+                            <span class="score">@item.Relevance.Value.ToString("0.00", CultureInfo.InvariantCulture)</span>
+                            <p class="summary">@item.Summary</p>
+                            @if (item.Tags.Count > 0)
+                            {
+                                <p class="tags">@string.Join(", ", item.Tags)</p>
+                            }
+                        </li>
+                    }
+                </ul>
+            </section>
+        }
+    }
+}
+
+@code {
+    private bool _busy;
+    private string? _status;
+    private AgentProgress? _progress;
+    private string? _category;
+    private string? _tag;
+    private NewsAggregator.Core.Domain.Digest? _digest;
+    private CancellationTokenSource? _cts;
+
+    // The UI only invokes the application service and renders the result — all filtering
+    // lives in the pure Core DigestFilter; no business logic lives here (docs §2.6).
+    private async Task RefreshAsync()
+    {
+        _busy = true;
+        _status = null;
+        _progress = null;
+        _category = null;
+        _tag = null;
+
+        // Cancel any in-flight refresh and start a fresh token so a refresh can't outlive the
+        // component (e.g. the user navigates away mid-run — see Dispose).
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = new CancellationTokenSource();
+        CancellationToken token = _cts.Token;
+
+        var progress = new Progress<AgentProgress>(p =>
+        {
+            _progress = p;
+            _ = InvokeAsync(StateHasChanged);
+        });
+
+        try
+        {
+            _digest = await DigestService.RefreshDigestAsync(progress, token);
+        }
+        catch (OperationCanceledException)
+        {
+            // Refresh was cancelled (component disposed / superseded) — nothing to surface.
+        }
+        catch (Exception ex)
+        {
+            _status = "Could not generate the digest. Check the model provider and try again.";
+            Logger.LogError(ex, "Digest refresh failed");
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+
+    public void Dispose()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+    }
+}
