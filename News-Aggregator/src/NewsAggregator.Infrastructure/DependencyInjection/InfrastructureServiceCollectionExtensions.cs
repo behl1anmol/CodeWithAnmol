@@ -6,6 +6,7 @@ using NewsAggregator.Core.Configuration;
 using NewsAggregator.Core.Domain;
 using NewsAggregator.Infrastructure.Agents;
 using NewsAggregator.Infrastructure.Caching;
+using NewsAggregator.Infrastructure.HealthChecks;
 using NewsAggregator.Infrastructure.Models;
 using NewsAggregator.Infrastructure.Sources;
 using NewsAggregator.Infrastructure.Workflows;
@@ -67,8 +68,16 @@ public static class InfrastructureServiceCollectionExtensions
 
         services.AddSingleton<IChatClientFactory, ChatClientFactory>();
 
-        // The model-provider reachability probe (and its single-shot HttpClient) is added in a
-        // later episode together with ModelProviderHealthCheck.
+        // Single-shot client for the provider reachability probe (ModelProviderHealthCheck): a 5s
+        // timeout caps the probe, and RemoveAllResilienceHandlers() opts it out of the global
+        // standard resilience handler (ServiceDefaults) so a down provider fails fast instead of
+        // burning retry backoff. The check itself is registered in the Web composition root.
+        // RemoveAllResilienceHandlers is [Experimental(EXTEXP0001)] but the documented opt-out.
+#pragma warning disable EXTEXP0001
+        services.AddHttpClient(ModelProviderHealthCheck.HttpClientName,
+                static client => client.Timeout = TimeSpan.FromSeconds(5))
+            .RemoveAllResilienceHandlers();
+#pragma warning restore EXTEXP0001
     }
 
     private static void AddAgentsAndWorkflows(this IServiceCollection services)
