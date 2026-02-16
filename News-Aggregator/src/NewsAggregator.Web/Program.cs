@@ -8,6 +8,9 @@ using NewsAggregator.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Aspire service defaults (telemetry, health checks, discovery, resilience).
+builder.AddServiceDefaults();
+
 // --- Configuration (Options pattern + fail-fast validation) ---
 builder.Services.AddOptions<SourceOptions>()
     .BindConfiguration(SourceOptions.SectionName)
@@ -36,7 +39,9 @@ builder.Services.AddScoped<IDigestApplicationService, DigestApplicationService>(
 // --- Infrastructure adapters bound to Core ports ---
 builder.Services.AddInfrastructure();
 
-// Probe the active model provider; surfaced on /health. "ready" marks it as a readiness check.
+// Probe the active model provider; surfaced on /health (and the Aspire dashboard) alongside
+// the ServiceDefaults "self" check. It carries no "live" tag, so it is excluded from the
+// liveness-only /alive route; "ready" is a conventional readiness marker (no route filters on it yet).
 builder.Services.AddHealthChecks()
     .AddCheck<ModelProviderHealthCheck>("model-provider", tags: ["ready"]);
 
@@ -58,5 +63,7 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+
+app.MapDefaultEndpoints();
 
 app.Run();
