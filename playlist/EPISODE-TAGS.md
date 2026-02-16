@@ -6,7 +6,7 @@
 > "empty start" is point-and-shoot.
 
 All snapshots live on the orphan **`teaching`** branch (a clean, linear, episode-ordered history,
-separate from `main`). Each episode `NN` has two tags:
+separate from `main`), which is pushed to the remote. Each episode `NN` has two tags:
 
 - **`start-epNN`** — the repo with everything from earlier episodes present and this episode's files
   not yet added (its clean "empty start").
@@ -78,6 +78,19 @@ SDK, so see *Verification* below) and are worth knowing when prepping:
 - **Project files (`.csproj`) carry their final package references from Ep1.** Unused packages don't
   break a build, and `Core.csproj` stays zero-package throughout (so `DependencyRuleTests` passes at
   every stage). The "add this package" beat can still be shown on camera.
+
+## Pushing the tags (one-time, run locally)
+
+The `teaching` branch is on the remote, but the **tags are not yet pushed**: the automated
+environment that built them has a git proxy that blocks `refs/tags/*` (branch pushes succeed, tag
+pushes return `403`). Recreate and push all 31 tags from the already-pushed branch with:
+
+```bash
+./playlist/create-tags.sh            # defaults to: origin  origin/teaching
+```
+
+It rebuilds the tags positionally from the linear `teaching` history and pushes them, so the result
+is identical to the tags built during reconstruction.
 
 ## Verification (run locally — needs the .NET 10 SDK on PATH)
 
