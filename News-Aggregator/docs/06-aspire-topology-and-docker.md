@@ -48,15 +48,15 @@ builder.Build().Run();
 ```
 
 > **Verified facts (corrected):**
-> - The local-LLM **client** is the native Microsoft package
->   `Microsoft.Extensions.AI.Ollama` (`OllamaChatClient`) ✅ — **no `OllamaSharp`, no
->   Community Toolkit**. See [§4.3](04-model-providers-and-byok.md).
+> - The local-LLM **client** is `OllamaSharp` (`OllamaApiClient` as `IChatClient`) ✅,
+>   the Microsoft-recommended Ollama client (`Microsoft.Extensions.AI.Ollama` is
+>   deprecated) — **no Community Toolkit**. See [§4.3](04-model-providers-and-byok.md).
 > - Aspire has **no first-party Ollama *hosting* integration**, so the Ollama runtime
 >   is modeled as a **generic container** with `AddContainer(...)` (part of
 >   `Aspire.Hosting.AppHost`) ✅. A named volume persists pulled models across runs.
 > - The container's endpoint is passed to the Web app via configuration
->   (`Models__Ollama__Endpoint`); the provider adapter constructs `OllamaChatClient`
->   from it. ⚠️ Verify the exact endpoint-accessor API for your Aspire version.
+>   (`Models__Ollama__Endpoint`); the provider adapter constructs the `OllamaSharp`
+>   `OllamaApiClient` from it. ⚠️ Verify the exact endpoint-accessor API for your Aspire version.
 > - **Alternative:** run Ollama on the host (developers already do `ollama pull`) and
 >   point `Models:Ollama:Endpoint` at it — no container at all.
 

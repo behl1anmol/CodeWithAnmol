@@ -2,39 +2,49 @@
 
 [← Model Providers & BYOK](04-model-providers-and-byok.md) · [Index](README.md) · [Next: Aspire Topology & Docker →](06-aspire-topology-and-docker.md)
 
-> **Read the version caveat in the [index](README.md) first.** Keep all
-> `Microsoft.Agents.AI.*` packages on the **same** version; pin every version from
-> nuget.org at implementation time. The "Version" column below is intentionally
-> "verify on nuget.org" rather than a hard number.
+> **Pinned versions are in [§5.0](#50-microsoft-libraries-that-must-be-version-pinned)**
+> (and summarized in the [index](README.md)). Agent Framework packages are all `1.8.0`;
+> `Microsoft.Extensions.AI` packages are `10.6.0` — two independent version lines. The
+> per-project tables below name packages; §5.0 is the source of truth for versions.
 
 ## 5.0 Microsoft libraries that MUST be version-pinned
 
-These are the fast-moving Microsoft packages (preview / RC / prerelease) where exact
-versions matter. **Pin an explicit version** for each, and keep every package **within
-a group** on the **same** version. Manage them centrally (e.g. `Directory.Packages.props`
-with Central Package Management) so versions can't drift between projects.
+Pin these **exact** versions, managed centrally via `Directory.Packages.props`
+(Central Package Management) so they can't drift between projects. Note the **two
+independent version lines**: Agent Framework is on its own `1.x` line while
+`Microsoft.Extensions.AI` follows the `10.x` (.NET 10) line — they are *not* meant to
+match each other.
 
-**Group 1 — Microsoft Agent Framework (all must match each other):**
-- `Microsoft.Agents.AI`
-- `Microsoft.Agents.AI.Workflows`
-- `Microsoft.Agents.AI.OpenAI`
+**Group 1 — Microsoft Agent Framework — all on `1.8.0`:**
+| Package | Version |
+| --- | --- |
+| `Microsoft.Agents.AI` | `1.8.0` |
+| `Microsoft.Agents.AI.Workflows` | `1.8.0` |
+| `Microsoft.Agents.AI.OpenAI` | `1.8.0` |
 
-**Group 2 — Microsoft.Extensions.AI (keep matched):**
-- `Microsoft.Extensions.AI`
-- `Microsoft.Extensions.AI.Abstractions` *(usually transitive; pin if referenced directly)*
-- `Microsoft.Extensions.AI.Ollama` *(**`--prerelease`** — native `OllamaChatClient`)*
+**Group 2 — Microsoft.Extensions.AI — all on `10.6.0`:**
+| Package | Version |
+| --- | --- |
+| `Microsoft.Extensions.AI` | `10.6.0` |
+| `Microsoft.Extensions.AI.Abstractions` | `10.6.0` *(usually transitive; pin if referenced directly)* |
 
-**Group 3 — .NET Aspire (pin to one Aspire release line):**
-- `Aspire.Hosting.AppHost`
-- `Aspire.AppHost.Sdk`
-- `Microsoft.Extensions.ServiceDiscovery`
-- `Aspire.Hosting.Redis` *(optional — only with Redis cache)*
-- `Aspire.StackExchange.Redis.DistributedCaching` *(optional — client side)*
+**Group 3 — .NET Aspire — pin to one Aspire release line ⚠️ (confirm the line for .NET 10):**
+| Package | Version |
+| --- | --- |
+| `Aspire.Hosting.AppHost` | ⚠️ pin |
+| `Aspire.AppHost.Sdk` | ⚠️ pin |
+| `Microsoft.Extensions.ServiceDiscovery` | ⚠️ pin |
+| `Aspire.Hosting.Redis` *(optional)* | ⚠️ pin |
+| `Aspire.StackExchange.Redis.DistributedCaching` *(optional)* | ⚠️ pin |
 
-> **Not used (intentionally):** `OllamaSharp`, `CommunityToolkit.Aspire.Hosting.Ollama`,
-> `CommunityToolkit.Aspire.OllamaSharp`. Ollama is covered end-to-end by native
-> Microsoft libraries + first-party Aspire (see [§4.3](04-model-providers-and-byok.md),
-> [§6.1](06-aspire-topology-and-docker.md)).
+**Local-LLM client (third-party, but Microsoft-recommended):**
+| Package | Version |
+| --- | --- |
+| `OllamaSharp` | v4+ ⚠️ pin — provides `OllamaApiClient` as `IChatClient` |
+
+> **Deprecated / not used:** `Microsoft.Extensions.AI.Ollama` (**deprecated** — the
+> official .NET AI *Chat with a local AI model* quickstart uses `OllamaSharp` instead),
+> `CommunityToolkit.Aspire.Hosting.Ollama`, `CommunityToolkit.Aspire.OllamaSharp`.
 
 ## 5.1 Package recommendations by project
 
@@ -53,16 +63,15 @@ Legend: ✅ verified name · ⚠️ verify version/exact name · ❓ uncertain (
 | `Microsoft.Agents.AI.OpenAI` | ✅ / ⚠️ ver | `AsAIAgent()` bridge for OpenAI-compatible (OpenRouter). |
 | `Microsoft.Extensions.AI` | ✅ | `IChatClient`, `ChatClientBuilder`, `UseFunctionInvocation`, `UseOpenTelemetry`. |
 | `Microsoft.Extensions.AI.Abstractions` | ✅ | Abstractions (`ChatMessage`, `ChatResponse`); usually transitive via `Microsoft.Extensions.AI`. |
-| `Microsoft.Extensions.AI.Ollama` | ✅ / ⚠️ **prerelease** | Native Microsoft `OllamaChatClient` (`IChatClient`) for local LLM. Use `--prerelease`; pin exact version. No OllamaSharp / Community Toolkit needed. |
+| `OllamaSharp` (v4+) | ✅ | `OllamaApiClient` implementing `IChatClient` for local LLM. Microsoft-recommended Ollama client; `Microsoft.Extensions.AI.Ollama` is deprecated. No Community Toolkit needed. |
 | `OpenAI` | ✅ | Official OpenAI SDK; OpenRouter via base-URL override (⚠️ verify option). |
 | `Microsoft.Extensions.Http` | ✅ | `IHttpClientFactory` for source connectors. |
 | `System.ServiceModel.Syndication` | ✅ | RSS/Atom parsing for the RSS connector. |
 | `Microsoft.Extensions.Caching.Abstractions` | ✅ | `IDistributedCache`/`IMemoryCache` for digest/source caching. |
 
-> **No Community Toolkit / OllamaSharp.** The local-LLM client is the native
-> `Microsoft.Extensions.AI.Ollama` `OllamaChatClient`, registered by the Infrastructure
-> provider adapter and reading its endpoint/model from configuration (which the Aspire
-> AppHost injects — see [§6](06-aspire-topology-and-docker.md)).
+> **No Community Toolkit.** The local-LLM client is `OllamaSharp`'s `OllamaApiClient`,
+> registered by the Infrastructure provider adapter and reading its endpoint/model from
+> configuration (which the Aspire AppHost injects — see [§6](06-aspire-topology-and-docker.md)).
 
 ### Web (`NewsAggregator.Web`)
 | Package | Status | Purpose |

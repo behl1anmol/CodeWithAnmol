@@ -14,7 +14,7 @@ graph TD
     Pipe["IChatClient pipeline<br/>.UseFunctionInvocation().UseOpenTelemetry() ✅"]
     ICC["IChatClient (Microsoft.Extensions.AI) ✅"]
     subgraph Providers
-        Oll["OllamaChatClient (Microsoft.Extensions.AI.Ollama) ✅<br/>local"]
+        Oll["OllamaApiClient (OllamaSharp) ✅<br/>local"]
         OR["OpenAIClient → AsIChatClient() ✅<br/>OpenRouter base URL (BYOK)"]
     end
 
@@ -58,40 +58,43 @@ graph LR
     P --> AF
 ```
 
-## 4.3 Ollama (local LLM) — verified, native Microsoft support
+## 4.3 Ollama (local LLM) — verified
 
-Use the **native** Microsoft package **`Microsoft.Extensions.AI.Ollama`** ✅. It
-provides `OllamaChatClient` (an `IChatClient`), and the Agent Framework's
-`IChatClient.AsAIAgent(...)` extension (from `Microsoft.Agents.AI`) turns it straight
-into an agent. This is the approach shown in the official Agent Framework Ollama
-provider docs (C#) — **no `OllamaSharp` and no Community Toolkit are required**.
+Use the **`OllamaSharp`** package ✅ — the client the official .NET AI *“Chat with a
+local AI model”* quickstart uses. **`Microsoft.Extensions.AI.Ollama` is deprecated; do
+not use it.** `OllamaSharp`'s `OllamaApiClient` implements
+`Microsoft.Extensions.AI.IChatClient` (v4+), so the Agent Framework's
+`IChatClient.AsAIAgent(...)` (or `new ChatClientAgent(...)`) builds an agent directly
+from it. **No Community Toolkit is required.**
 
 ```csharp
-// Verbatim from Microsoft Learn (Agent Framework › Ollama provider, C#). ✅
-// Requires: dotnet add package Microsoft.Extensions.AI.Ollama --prerelease   ⚠️ prerelease
-using Microsoft.Agents.AI;       // ✅ AIAgent, AsAIAgent
-using Microsoft.Extensions.AI;   // ✅ OllamaChatClient (Microsoft.Extensions.AI.Ollama)
+// Illustrative — pin OllamaSharp v4+ (see §5.0).
+using Microsoft.Agents.AI;       // ✅ AIAgent, ChatClientAgent, AsAIAgent
+using Microsoft.Extensions.AI;   // ✅ IChatClient
+using OllamaSharp;               // ✅ OllamaApiClient (implements IChatClient, v4+)
 
-var chatClient = new OllamaChatClient(
+IChatClient chatClient = new OllamaApiClient(
     new Uri("http://localhost:11434"),   // Ollama default port ✅
-    modelId: "llama3.2");                 // model id
+    "llama3.2");                          // model id
 
 AIAgent agent = chatClient.AsAIAgent(     // ✅ IChatClient → AIAgent
     instructions: "You are a helpful assistant running locally via Ollama.");
+// Equivalent: new ChatClientAgent(chatClient, instructions: "...");  ✅
 ```
 
-In this design `OllamaChatClient` is created inside the Infrastructure provider
-adapter and (like every provider) wrapped in the `IChatClient` pipeline of §4.5
-before an agent is built — keeping telemetry/function-invocation uniform.
+In this design `OllamaApiClient` is created inside the Infrastructure provider adapter
+and (like every provider) wrapped in the `IChatClient` pipeline of §4.5 before an agent
+is built — keeping telemetry/function-invocation uniform.
 
 Notes (verified):
-- Package is currently **prerelease** (`--prerelease`) ✅⚠️ — pin the exact version
-  (see [§5](05-packages-and-configuration.md)) and re-verify on nuget.org.
+- `OllamaSharp` is third-party but is the **Microsoft-recommended** Ollama client for
+  .NET; `Microsoft.Extensions.AI.Ollama` is **deprecated**.
+- `OllamaApiClient` implements `IChatClient` from OllamaSharp **v4+** ✅ — pin v4+.
 - Ollama default endpoint is `http://localhost:11434` ✅.
 - **Not all local models support tool/function calling.** For agents that use tools
   or structured output, use models known to support it (e.g. `llama3.2`, `qwen3`).
   Models without tool support still work for plain summarization.
-- Embeddings (post-MVP) use the same M.E.AI family via
+- Embeddings (post-MVP) use the same `OllamaApiClient` family as
   `IEmbeddingGenerator<string, Embedding<float>>` ✅ (e.g. `all-minilm`).
 
 ## 4.4 OpenRouter (BYOK, OpenAI-compatible) — verified pattern, one flag
@@ -130,9 +133,9 @@ ChatClientAgent agent = openAi
 | OpenRouter ranking headers (`HTTP-Referer`, `X-Title`) | ❓ | Optional OpenRouter attribution headers; add via the `HttpClient`/transport if desired. Not required to function. |
 
 > **Same mechanism also gives Ollama an OpenAI-compatible fallback:** Ollama exposes
-> `http://localhost:11434/v1/` ✅. If the native `OllamaChatClient` were ever
-> unsuitable, the OpenAI route pointed at that base URL is a verified backup path.
-> MVP default remains the native `Microsoft.Extensions.AI.Ollama` client.
+> `http://localhost:11434/v1/` ✅. If the `OllamaSharp` client were ever unsuitable,
+> the OpenAI route pointed at that base URL is a verified backup path. MVP default
+> remains the `OllamaSharp` `OllamaApiClient`.
 
 ## 4.5 The `IChatClient` pipeline (cross-cutting, verified)
 

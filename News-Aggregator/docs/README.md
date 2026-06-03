@@ -29,12 +29,19 @@ accompanied by an alternative. Use the legend below throughout the docs:
 | ⚠️ | Real, but **version / exact option must be re-verified** at implementation time (preview→GA churn). |
 | ❓ | **Uncertain** — an alternative is provided; confirm before coding. |
 
-> **Versioning caveat (read first):** Microsoft Agent Framework reached 1.0 in
-> 2026. At the time of writing, the `Microsoft.Agents.AI` core package reports a
-> `1.x` GA line, while some companion API-reference pages (Workflows, OpenAI bridge)
-> still display `1.0.0-rc2`. **Do not hard-code a version from these docs** — pin
-> versions from nuget.org during implementation and keep all
-> `Microsoft.Agents.AI.*` packages on the **same** version.
+> **Pinned versions (read first):** This design targets these exact versions —
+> manage them centrally (`Directory.Packages.props`) so they can't drift:
+> - **Microsoft Agent Framework — `1.8.0`** (all aligned): `Microsoft.Agents.AI`,
+>   `Microsoft.Agents.AI.Workflows`, `Microsoft.Agents.AI.OpenAI`.
+> - **Microsoft.Extensions.AI — `10.6.0`**: `Microsoft.Extensions.AI`,
+>   `Microsoft.Extensions.AI.Abstractions`.
+> - **`.NET Aspire`** — pin to one Aspire release line (⚠️ confirm the line for .NET 10).
+> - **Local LLM** — `OllamaSharp` (v4+); **`Microsoft.Extensions.AI.Ollama` is
+>   deprecated** and is *not* used.
+>
+> Note the **two independent version lines**: Agent Framework is on `1.x`, while
+> `Microsoft.Extensions.AI` follows the `10.x` (.NET 10) line — they are *not* meant
+> to match each other. Full table in [§5.0](05-packages-and-configuration.md).
 
 ---
 

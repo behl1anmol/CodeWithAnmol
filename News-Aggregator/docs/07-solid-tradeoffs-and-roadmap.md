@@ -48,16 +48,16 @@ Supporting rules (from the brief), and where they're enforced:
 - **Cost:** no persistence/recovery across restarts. The Durable Task extension can add
   checkpointing to the same `WorkflowBuilder` graphs later ✅ — deferred (7.4).
 
-### E. Native Ollama client vs OllamaSharp / Community Toolkit
-- **Chosen:** the **native Microsoft** `Microsoft.Extensions.AI.Ollama` `OllamaChatClient`
-  + `AsAIAgent` for the client, and a **first-party** Aspire generic container
-  (`AddContainer`) for hosting. **No `OllamaSharp`, no Community Toolkit.**
-- **Why:** fewer third-party dependencies, one vendor (Microsoft) for the AI stack,
-  and the path shown in the official Agent Framework Ollama provider docs.
-- **Cost:** `Microsoft.Extensions.AI.Ollama` is currently **prerelease** ⚠️ — pin the
-  exact version and re-verify on nuget.org. Aspire has no first-party Ollama *hosting*
-  integration, so hosting is a generic container (slightly more wiring than a turnkey
-  integration). *Alternative:* run Ollama on the host and configure the endpoint.
+### E. Ollama client: OllamaSharp (Microsoft-recommended) + first-party container
+- **Chosen:** `OllamaSharp` (`OllamaApiClient` as `IChatClient`) for the client —
+  wrapped by `AsAIAgent`/`ChatClientAgent` — and a **first-party** Aspire generic
+  container (`AddContainer`) for hosting. **No Community Toolkit.**
+- **Why:** `OllamaSharp` is the client used by the official .NET AI *Chat with a local
+  AI model* quickstart; `Microsoft.Extensions.AI.Ollama` is **deprecated**. Because
+  `OllamaApiClient` is an `IChatClient`, agents/workflows are unaffected by the choice.
+- **Cost:** one third-party dependency (`OllamaSharp`, pin v4+). Aspire has no
+  first-party Ollama *hosting* integration, so hosting is a generic container (slightly
+  more wiring). *Alternative:* run Ollama on the host and configure the endpoint.
 
 ### F. `IChatClient` in Core vs strictly BCL-only Core
 - **Chosen:** strictly BCL-only Core; M.E.AI abstractions stay in Infrastructure.

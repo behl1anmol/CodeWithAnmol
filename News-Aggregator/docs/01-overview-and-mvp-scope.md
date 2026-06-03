@@ -26,7 +26,7 @@ The aggregator solves this by:
 | Sources | **Hacker News** (Firebase API, keyless) + **RSS/Atom** (config-driven) |
 | Agent runtime | Microsoft Agent Framework (`Microsoft.Agents.AI*`) ✅ |
 | Model abstraction | `Microsoft.Extensions.AI` (`IChatClient`) ✅ |
-| Local models | Ollama via native `Microsoft.Extensions.AI.Ollama` (`OllamaChatClient`) ✅ |
+| Local models | Ollama via `OllamaSharp` (`OllamaApiClient` as `IChatClient`) ✅ |
 | Hosted models (BYOK) | OpenRouter via OpenAI-compatible SDK ✅ |
 | Local composition | .NET Aspire (AppHost) ✅ |
 | Persistence | In-memory + optional distributed cache (Redis) only — **no database in MVP** |
