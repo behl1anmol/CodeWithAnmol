@@ -1,0 +1,7 @@
+title: Multi-Source Tech News Aggregator — Architecture
+description: Design documentation for a .NET 10 multi-agent tech news aggregator built on Microsoft Agent Framework, Microsoft.Extensions.AI and .NET Aspire.
+theme: jekyll-theme-cayman
+markdown: kramdown
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
