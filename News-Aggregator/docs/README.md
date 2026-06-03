@@ -34,8 +34,11 @@ accompanied by an alternative. Use the legend below throughout the docs:
 > - **Microsoft Agent Framework — `1.8.0`** (all aligned): `Microsoft.Agents.AI`,
 >   `Microsoft.Agents.AI.Workflows`, `Microsoft.Agents.AI.OpenAI`.
 > - **Microsoft.Extensions.AI — `10.6.0`**: `Microsoft.Extensions.AI`,
->   `Microsoft.Extensions.AI.Abstractions`.
-> - **`.NET Aspire`** — pin to one Aspire release line (⚠️ confirm the line for .NET 10).
+>   `Microsoft.Extensions.AI.Abstractions`, **`Microsoft.Extensions.AI.OpenAI`**
+>   (ships `AsIChatClient()` — required for the OpenRouter/OpenAI adapter route).
+> - **`.NET Aspire` — `13.4.0`**: `Aspire.Hosting.AppHost`, `Aspire.AppHost.Sdk`,
+>   `Microsoft.Extensions.ServiceDiscovery`, `Aspire.Hosting.Redis` (optional),
+>   `Aspire.StackExchange.Redis.DistributedCaching` (optional).
 > - **Local LLM** — `OllamaSharp` (v4+); **`Microsoft.Extensions.AI.Ollama` is
 >   deprecated** and is *not* used.
 >

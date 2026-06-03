@@ -27,15 +27,16 @@ match each other.
 | --- | --- |
 | `Microsoft.Extensions.AI` | `10.6.0` |
 | `Microsoft.Extensions.AI.Abstractions` | `10.6.0` *(usually transitive; pin if referenced directly)* |
+| `Microsoft.Extensions.AI.OpenAI` | `10.6.0` — ships `OpenAIClientExtensions.AsIChatClient()`; **required** for Route A of the OpenRouter/OpenAI adapter |
 
-**Group 3 — .NET Aspire — pin to one Aspire release line ⚠️ (confirm the line for .NET 10):**
+**Group 3 — .NET Aspire — all on `13.4.0`:**
 | Package | Version |
 | --- | --- |
-| `Aspire.Hosting.AppHost` | ⚠️ pin |
-| `Aspire.AppHost.Sdk` | ⚠️ pin |
-| `Microsoft.Extensions.ServiceDiscovery` | ⚠️ pin |
-| `Aspire.Hosting.Redis` *(optional)* | ⚠️ pin |
-| `Aspire.StackExchange.Redis.DistributedCaching` *(optional)* | ⚠️ pin |
+| `Aspire.Hosting.AppHost` | `13.4.0` |
+| `Aspire.AppHost.Sdk` | `13.4.0` |
+| `Microsoft.Extensions.ServiceDiscovery` | `13.4.0` |
+| `Aspire.Hosting.Redis` *(optional)* | `13.4.0` |
+| `Aspire.StackExchange.Redis.DistributedCaching` *(optional)* | `13.4.0` |
 
 **Local-LLM client (third-party, but Microsoft-recommended):**
 | Package | Version |
@@ -64,6 +65,7 @@ Legend: ✅ verified name · ⚠️ verify version/exact name · ❓ uncertain (
 | `Microsoft.Extensions.AI` | ✅ | `IChatClient`, `ChatClientBuilder`, `UseFunctionInvocation`, `UseOpenTelemetry`. |
 | `Microsoft.Extensions.AI.Abstractions` | ✅ | Abstractions (`ChatMessage`, `ChatResponse`); usually transitive via `Microsoft.Extensions.AI`. |
 | `OllamaSharp` (v4+) | ✅ | `OllamaApiClient` implementing `IChatClient` for local LLM. Microsoft-recommended Ollama client; `Microsoft.Extensions.AI.Ollama` is deprecated. No Community Toolkit needed. |
+| `Microsoft.Extensions.AI.OpenAI` | ✅ | `OpenAIClientExtensions.AsIChatClient()` — bridges `OpenAI.Chat.ChatClient` to `IChatClient` (Route A for OpenRouter). Pin at `10.6.0` with the other M.E.AI packages. |
 | `OpenAI` | ✅ | Official OpenAI SDK; OpenRouter via base-URL override (⚠️ verify option). |
 | `Microsoft.Extensions.Http` | ✅ | `IHttpClientFactory` for source connectors. |
 | `System.ServiceModel.Syndication` | ✅ | RSS/Atom parsing for the RSS connector. |

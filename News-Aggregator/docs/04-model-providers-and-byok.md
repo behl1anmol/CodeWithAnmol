@@ -105,8 +105,9 @@ at the type level:
 **Route A — via `Microsoft.Extensions.AI` directly:**
 ```csharp
 // Illustrative — verify the endpoint-override option name (see ⚠️ below).
-using Microsoft.Extensions.AI;   // ✅
-using OpenAI;                     // ✅ OpenAIClient
+using Microsoft.Extensions.AI;       // ✅
+using Microsoft.Extensions.AI.OpenAI; // ✅ OpenAIClientExtensions.AsIChatClient — from Microsoft.Extensions.AI.OpenAI (10.6.0)
+using OpenAI;                         // ✅ OpenAIClient
 
 var openAi = new OpenAIClient(
     new System.ClientModel.ApiKeyCredential(openRouterApiKey),
@@ -127,7 +128,7 @@ ChatClientAgent agent = openAi
 | Item | Status | Detail / alternative |
 | --- | --- | --- |
 | OpenRouter is OpenAI-compatible | ✅ | Base URL `https://openrouter.ai/api/v1`. |
-| `OpenAIClient.GetChatClient(model).AsIChatClient()` | ✅ | Bridges to `IChatClient`. |
+| `OpenAIClient.GetChatClient(model).AsIChatClient()` | ✅ | Bridges to `IChatClient`; extension from **`Microsoft.Extensions.AI.OpenAI`** (`10.6.0`) — must be referenced explicitly (see §5.0). |
 | `OpenAIChatClientExtensions.AsAIAgent(...)` | ✅ | From `Microsoft.Agents.AI.OpenAI`. |
 | **Exact endpoint-override option** (`OpenAIClientOptions.Endpoint`) | ⚠️ | Property name/shape varies by OpenAI SDK version. **Verify** against the installed `OpenAI` package. *Alternative:* construct the OpenAI client with a custom transport/`HttpClient` whose `BaseAddress` points at OpenRouter. |
 | OpenRouter ranking headers (`HTTP-Referer`, `X-Title`) | ❓ | Optional OpenRouter attribution headers; add via the `HttpClient`/transport if desired. Not required to function. |
