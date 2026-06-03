@@ -48,11 +48,16 @@ Supporting rules (from the brief), and where they're enforced:
 - **Cost:** no persistence/recovery across restarts. The Durable Task extension can add
   checkpointing to the same `WorkflowBuilder` graphs later ✅ — deferred (7.4).
 
-### E. Community Toolkit Ollama hosting (risk callout)
-- Aspire's Ollama hosting/client are **Community Toolkit**, not Microsoft-owned ⚠️.
-- **Risk:** version drift vs the core Aspire/.NET 10 line.
-- **Mitigation:** the documented fallback is a plain `AddContainer("ollama", ...)` plus
-  config-driven endpoint, keeping us unblocked if the toolkit lags. ([§6.1](06-aspire-topology-and-docker.md))
+### E. Native Ollama client vs OllamaSharp / Community Toolkit
+- **Chosen:** the **native Microsoft** `Microsoft.Extensions.AI.Ollama` `OllamaChatClient`
+  + `AsAIAgent` for the client, and a **first-party** Aspire generic container
+  (`AddContainer`) for hosting. **No `OllamaSharp`, no Community Toolkit.**
+- **Why:** fewer third-party dependencies, one vendor (Microsoft) for the AI stack,
+  and the path shown in the official Agent Framework Ollama provider docs.
+- **Cost:** `Microsoft.Extensions.AI.Ollama` is currently **prerelease** ⚠️ — pin the
+  exact version and re-verify on nuget.org. Aspire has no first-party Ollama *hosting*
+  integration, so hosting is a generic container (slightly more wiring than a turnkey
+  integration). *Alternative:* run Ollama on the host and configure the endpoint.
 
 ### F. `IChatClient` in Core vs strictly BCL-only Core
 - **Chosen:** strictly BCL-only Core; M.E.AI abstractions stay in Infrastructure.

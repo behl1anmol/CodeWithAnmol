@@ -12,49 +12,53 @@ logic). It declares the resources, wires endpoints/connection strings, and provi
 graph TD
     subgraph AppHost["NewsAggregator.AppHost (Aspire app model)"]
         Web["webfrontend<br/>(Blazor Server)"]
-        Ollama["ollama<br/>(container) ✅⚠️ Community Toolkit"]
-        Model["llama3.2<br/>(OllamaModelResource) ⚠️"]
+        Ollama["ollama<br/>(first-party generic container) ✅"]
         Redis["redis (optional)<br/>distributed cache ⚠️ver"]
     end
     Dash["Aspire Dashboard<br/>(traces / logs / metrics)"]
 
-    Ollama --> Model
-    Model -->|"connection string<br/>Endpoint=...;Model=..."| Web
+    Ollama -->|"endpoint via env<br/>Models__Ollama__Endpoint"| Web
     Redis -->|connection string| Web
     Web --> Dash
     Ollama --> Dash
 ```
 
-### Illustrative AppHost wiring
+### Illustrative AppHost wiring (first-party Aspire only)
 ```csharp
-// Illustrative — verify Community Toolkit API/version before use.
+// Illustrative — verify Aspire API/version before use. No Community Toolkit.
 var builder = DistributedApplication.CreateBuilder(args);
 
-// Local LLM — Community Toolkit Ollama hosting ⚠️
-var ollama = builder.AddOllama("ollama")          // ⚠️ CommunityToolkit.Aspire.Hosting.Ollama
-                    .WithDataVolume();             // persist pulled models across runs
-var llama  = ollama.AddModel("llama3.2");         // ⚠️ OllamaModelResource
+// Local LLM — Ollama modeled as a first-party generic container ✅
+var ollama = builder.AddContainer("ollama", "ollama/ollama")  // Aspire.Hosting.AppHost
+                    .WithHttpEndpoint(targetPort: 11434, name: "http")
+                    .WithVolume("ollama-models", "/root/.ollama"); // persist pulled models
 
 // Optional cache
 var redis = builder.AddRedis("redis");            // ⚠️ verify version
 
 builder.AddProject<Projects.NewsAggregator_Web>("webfrontend")
-       .WithReference(llama)                       // injects Endpoint=...;Model=... ✅ format
+       // Inject the Ollama endpoint into the Web app's configuration.
+       .WithEnvironment("Models__Ollama__Endpoint",
+                        ollama.GetEndpoint("http"))   // ⚠️ verify endpoint accessor name
        .WithReference(redis)
+       .WaitFor(ollama)
        .WithExternalHttpEndpoints();
 
 builder.Build().Run();
 ```
 
-> **Verified Aspire facts:**
-> - Aspire's Ollama integration is **Community Toolkit**, not first-party:
->   `CommunityToolkit.Aspire.Hosting.Ollama` (hosting) and
->   `CommunityToolkit.Aspire.OllamaSharp` (client) ✅.
-> - Since the toolkit's 9.0 release, models are **resources** (`OllamaModelResource`)
->   and the connection string is a real `Endpoint=<...>;Model=<...>` format ✅.
-> - **Flag:** pin the toolkit version compatible with your Aspire/.NET 10 line ⚠️.
->   *Alternative if the toolkit lags:* model Ollama as a plain container
->   (`AddContainer("ollama", "ollama/ollama")`) and pass the endpoint via env/config.
+> **Verified facts (corrected):**
+> - The local-LLM **client** is the native Microsoft package
+>   `Microsoft.Extensions.AI.Ollama` (`OllamaChatClient`) ✅ — **no `OllamaSharp`, no
+>   Community Toolkit**. See [§4.3](04-model-providers-and-byok.md).
+> - Aspire has **no first-party Ollama *hosting* integration**, so the Ollama runtime
+>   is modeled as a **generic container** with `AddContainer(...)` (part of
+>   `Aspire.Hosting.AppHost`) ✅. A named volume persists pulled models across runs.
+> - The container's endpoint is passed to the Web app via configuration
+>   (`Models__Ollama__Endpoint`); the provider adapter constructs `OllamaChatClient`
+>   from it. ⚠️ Verify the exact endpoint-accessor API for your Aspire version.
+> - **Alternative:** run Ollama on the host (developers already do `ollama pull`) and
+>   point `Models:Ollama:Endpoint` at it — no container at all.
 
 ### ServiceDefaults
 Per [§2](02-architecture-and-project-structure.md), the ServiceDefaults extension

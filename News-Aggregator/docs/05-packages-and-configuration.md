@@ -7,6 +7,35 @@
 > nuget.org at implementation time. The "Version" column below is intentionally
 > "verify on nuget.org" rather than a hard number.
 
+## 5.0 Microsoft libraries that MUST be version-pinned
+
+These are the fast-moving Microsoft packages (preview / RC / prerelease) where exact
+versions matter. **Pin an explicit version** for each, and keep every package **within
+a group** on the **same** version. Manage them centrally (e.g. `Directory.Packages.props`
+with Central Package Management) so versions can't drift between projects.
+
+**Group 1 — Microsoft Agent Framework (all must match each other):**
+- `Microsoft.Agents.AI`
+- `Microsoft.Agents.AI.Workflows`
+- `Microsoft.Agents.AI.OpenAI`
+
+**Group 2 — Microsoft.Extensions.AI (keep matched):**
+- `Microsoft.Extensions.AI`
+- `Microsoft.Extensions.AI.Abstractions` *(usually transitive; pin if referenced directly)*
+- `Microsoft.Extensions.AI.Ollama` *(**`--prerelease`** — native `OllamaChatClient`)*
+
+**Group 3 — .NET Aspire (pin to one Aspire release line):**
+- `Aspire.Hosting.AppHost`
+- `Aspire.AppHost.Sdk`
+- `Microsoft.Extensions.ServiceDiscovery`
+- `Aspire.Hosting.Redis` *(optional — only with Redis cache)*
+- `Aspire.StackExchange.Redis.DistributedCaching` *(optional — client side)*
+
+> **Not used (intentionally):** `OllamaSharp`, `CommunityToolkit.Aspire.Hosting.Ollama`,
+> `CommunityToolkit.Aspire.OllamaSharp`. Ollama is covered end-to-end by native
+> Microsoft libraries + first-party Aspire (see [§4.3](04-model-providers-and-byok.md),
+> [§6.1](06-aspire-topology-and-docker.md)).
+
 ## 5.1 Package recommendations by project
 
 Legend: ✅ verified name · ⚠️ verify version/exact name · ❓ uncertain (alternative given).
@@ -24,16 +53,16 @@ Legend: ✅ verified name · ⚠️ verify version/exact name · ❓ uncertain (
 | `Microsoft.Agents.AI.OpenAI` | ✅ / ⚠️ ver | `AsAIAgent()` bridge for OpenAI-compatible (OpenRouter). |
 | `Microsoft.Extensions.AI` | ✅ | `IChatClient`, `ChatClientBuilder`, `UseFunctionInvocation`, `UseOpenTelemetry`. |
 | `Microsoft.Extensions.AI.Abstractions` | ✅ | Abstractions (`ChatMessage`, `ChatResponse`); usually transitive via `Microsoft.Extensions.AI`. |
-| `OllamaSharp` | ✅ | `OllamaApiClient` implementing `IChatClient` (local LLM). |
+| `Microsoft.Extensions.AI.Ollama` | ✅ / ⚠️ **prerelease** | Native Microsoft `OllamaChatClient` (`IChatClient`) for local LLM. Use `--prerelease`; pin exact version. No OllamaSharp / Community Toolkit needed. |
 | `OpenAI` | ✅ | Official OpenAI SDK; OpenRouter via base-URL override (⚠️ verify option). |
 | `Microsoft.Extensions.Http` | ✅ | `IHttpClientFactory` for source connectors. |
 | `System.ServiceModel.Syndication` | ✅ | RSS/Atom parsing for the RSS connector. |
 | `Microsoft.Extensions.Caching.Abstractions` | ✅ | `IDistributedCache`/`IMemoryCache` for digest/source caching. |
 
-> **Optional Aspire client integration for Ollama** (alternative to hand-wiring
-> `OllamaApiClient`): `CommunityToolkit.Aspire.OllamaSharp` ⚠️ (**Community Toolkit,
-> not Microsoft-owned** — verify version & .NET 10 compatibility). It registers
-> `IOllamaApiClient` / `IChatClient` from an Aspire Ollama connection string.
+> **No Community Toolkit / OllamaSharp.** The local-LLM client is the native
+> `Microsoft.Extensions.AI.Ollama` `OllamaChatClient`, registered by the Infrastructure
+> provider adapter and reading its endpoint/model from configuration (which the Aspire
+> AppHost injects — see [§6](06-aspire-topology-and-docker.md)).
 
 ### Web (`NewsAggregator.Web`)
 | Package | Status | Purpose |
@@ -49,8 +78,12 @@ Legend: ✅ verified name · ⚠️ verify version/exact name · ❓ uncertain (
 | --- | --- | --- |
 | `Aspire.Hosting.AppHost` | ✅ / ⚠️ ver | Aspire app model host. |
 | `Aspire.AppHost.Sdk` (SDK ref) | ✅ | Aspire AppHost build SDK. |
-| `CommunityToolkit.Aspire.Hosting.Ollama` | ⚠️ | **Community Toolkit** Ollama hosting (`AddOllama`, `OllamaModelResource`). Verify version. *Alternative:* model a raw container with `AddContainer("ollama", "ollama/ollama")`. |
 | `Aspire.Hosting.Redis` | ⚠️ ver | Optional Redis resource for distributed cache. |
+
+> **Ollama hosting** uses **first-party** Aspire only: model the Ollama runtime as a
+> generic container via `builder.AddContainer("ollama", "ollama/ollama")` (in
+> `Aspire.Hosting.AppHost`), or point config at a host-installed Ollama. **No
+> Community Toolkit package.** See [§6.1](06-aspire-topology-and-docker.md).
 
 ### Tests (`NewsAggregator.Tests`)
 | Package | Status | Purpose |
