@@ -6,14 +6,50 @@ namespace NewsAggregator.Core.Domain;
 /// </summary>
 public sealed record NewsItem
 {
-    public required string Id { get; init; }
+    public required string Id
+    {
+        get => field;
+        init
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(value);
+            field = value;
+        }
+    }
 
-    public required string Title { get; init; }
+    public required string Title
+    {
+        get => field;
+        init
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(value);
+            field = value;
+        }
+    }
 
-    public required Uri Url { get; init; }
+    public required Uri Url
+    {
+        get => field;
+        init
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            if (!value.IsAbsoluteUri)
+            {
+                throw new ArgumentException("News item URL must be absolute.", nameof(value));
+            }
+            field = value;
+        }
+    }
 
     /// <summary>Name of the originating source (e.g. "HackerNews", "RSS").</summary>
-    public required string Source { get; init; }
+    public required string Source
+    {
+        get => field;
+        init
+        {
+            ArgumentException.ThrowIfNullOrWhiteSpace(value);
+            field = value;
+        }
+    }
 
     /// <summary>Optional article body / excerpt when the source provides one.</summary>
     public string? Content { get; init; }

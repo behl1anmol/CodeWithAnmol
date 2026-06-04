@@ -24,6 +24,11 @@ public sealed class DigestApplicationService : IDigestApplicationService
         IEditorialWorkflow editorial,
         IDigestCache cache)
     {
+        ArgumentNullException.ThrowIfNull(aggregation);
+        ArgumentNullException.ThrowIfNull(enrichment);
+        ArgumentNullException.ThrowIfNull(editorial);
+        ArgumentNullException.ThrowIfNull(cache);
+
         _aggregation = aggregation;
         _enrichment = enrichment;
         _editorial = editorial;
