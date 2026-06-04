@@ -3,7 +3,7 @@
 **Project:** `/mnt/stuff/CommonProjects/CodeWithAnmol/News-Aggregator`
 **Branch:** `feat/core-business-logic` (off `main`)
 **PR:** [#3](https://github.com/behl1anmol/CodeWithAnmol/pull/3) — base `main`
-**Commits:** `3f81e17` (Core logic), `2200e6d` (tests)
+**Commits:** `3f81e17` (Core logic), `2200e6d` (tests), `146b51b` (docs), `d00ddd0` (dedup fix)
 **Stack:** .NET 10 (`net10.0`), C# 14 (`LangVersion=latest`), xUnit + NSubstitute, pragmatic Clean Architecture (Core / Infrastructure / Web / AppHost / Tests).
 
 ---
@@ -62,7 +62,22 @@ Two commits already on branch; pushed `feat/core-business-logic` to origin; open
 
 ## Request 4 — Persist session
 This `.claude/` folder: `plans/01-core-business-logic.md`, `plans/02-core-tests.md`,
-`analysis/session.md` (this file), `analysis/implementation-summary.md`.
+`analysis/session.md` (this file), `analysis/implementation-summary.md`. Committed `146b51b`.
+
+## Request 5 — PR review comment (P2): include title hash in de-dup
+Comment on `NewsAggregationService.cs` (PR #3): code deduped by `CanonicalKey(item.Url)` only, but
+docs §1 + the class XML doc say "canonical URL / title hash" → same article from two sources under
+different URLs but same headline survives twice.
+
+- **Analysis:** partially valid — real code-vs-spec mismatch, but URL-only was a deliberate earlier
+  choice (title-OR merges distinct articles sharing a headline). Latent, not a live bug (no real
+  `INewsSource` adapters built yet). Asked user → chose **add title-hash**.
+- **Fix (`d00ddd0`):** drop item if canonical URL **OR** normalized title (lowercase,
+  whitespace-collapsed via `TitleKey`) already seen; first occurrence (lowest `Id`) wins. Tests:
+  factory title now defaults to `Id`; added `Removes_duplicates_by_normalized_title` +
+  `Keeps_items_with_distinct_titles_and_urls`. **76 tests pass.**
+- Reviewer reply attempt blocked by sandbox (outbound write out of scope); draft handed to user.
+- **Accepted tradeoff:** two genuinely distinct articles sharing a headline now collapse to one.
 
 ---
 

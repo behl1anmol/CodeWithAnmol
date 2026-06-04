@@ -1,6 +1,7 @@
 # Implementation Summary
 
-Branch `feat/core-business-logic` → PR #3 (base `main`). Two commits.
+Branch `feat/core-business-logic` → PR #3 (base `main`). Four commits: `3f81e17` Core, `2200e6d`
+tests, `146b51b` session docs, `d00ddd0` dedup fix (PR review).
 
 ## Commit 1 — `3f81e17` Core business logic (5 files)
 
@@ -17,9 +18,14 @@ Branch `feat/core-business-logic` → PR #3 (base `main`). Two commits.
 ### CollectAsync algorithm
 1. Fan out one `DrainAsync` task per `INewsSource`; `Task.WhenAll` (fail-fast — exceptions propagate).
 2. Flatten, `OrderBy(Id, Ordinal)` so the duplicate survivor is deterministic under concurrency.
-3. Dedupe by canonical URL key: `{scheme}://{authority}{path-without-trailing-slash}{query}`, lowercased scheme+authority, fragment dropped. Keep first.
+3. Dedupe by canonical URL **OR** normalized title (updated in `d00ddd0` — see below). Keep first.
 4. Sort `PublishedAt` descending (`Nullable.Compare(b, a)` → nulls last), tie-break `Id` ordinal.
 5. Return `deduped.AsReadOnly()` (immutable `ReadOnlyCollection`).
+
+### Dedup keys
+- **URL key** (`CanonicalKey`): `{scheme}://{authority}{path-without-trailing-slash}{query}`, lowercased scheme+authority, fragment dropped.
+- **Title key** (`TitleKey`): `title.ToLowerInvariant()` split on whitespace + rejoined with single space (case-insensitive, whitespace-collapsed).
+- Drop item if **either** key already seen. Tradeoff: distinct articles sharing a headline collapse to one (accepted per docs §1 + user decision).
 
 ### Validation pattern (C# 14 `field` keyword)
 ```csharp
@@ -43,8 +49,13 @@ each with optional shared `List<string>` call-log + recorded inputs), `Recording
 - `Application/DigestApplicationServiceOrchestrationTests.cs` — order `collect→enrich→compose→cache`, data wiring, single cache write, progress stages, null-progress safe, 4 ctor null-guard facts.
 - `Domain/NewsItemTests.cs`, `Domain/DigestTests.cs`, `Domain/EnrichedItemTests.cs` — all validation rules + defaults + `with`-revalidation.
 
+## Commit 4 — `d00ddd0` Dedup fix (PR review P2)
+Review flagged URL-only dedup vs docs' "canonical URL / title hash". Added `TitleKey` + dedup on URL
+OR title. Tests: factory title defaults to `Id`; added `Removes_duplicates_by_normalized_title` +
+`Keeps_items_with_distinct_titles_and_urls`. See `analysis/session.md` Request 5 for full rationale.
+
 ## Test result
-`74 passed, 0 failed` (9 pre-existing + 65 new). `DependencyRuleTests` confirms Core gained no
+`76 passed, 0 failed` (9 pre-existing + 67 new). `DependencyRuleTests` confirms Core gained no
 framework reference.
 
 ## Quality attributes honoured

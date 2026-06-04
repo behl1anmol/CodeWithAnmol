@@ -181,3 +181,6 @@ cd /tmp && dotnet test  .../NewsAggregator.Tests.csproj  # all existing tests gr
 
 Implemented exactly as planned. Core built clean (0 warnings/0 errors); all 9 existing tests
 green incl. `DependencyRuleTests`. Committed as `3f81e17` on branch `feat/core-business-logic`.
+
+**Later change (`d00ddd0`, PR review P2):** dedup extended from URL-only to **canonical URL OR
+normalized title** to match docs §1 ("URL / title hash"). See `analysis/session.md` Request 5.
