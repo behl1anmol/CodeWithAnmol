@@ -12,8 +12,10 @@ namespace NewsAggregator.Tests.Application;
 /// </summary>
 public sealed class NewsAggregationServiceTests
 {
-    private static NewsItem Item(string id, string url, DateTimeOffset? published = null)
-        => new() { Id = id, Title = "t", Url = new Uri(url), Source = "src", PublishedAt = published };
+    // Title defaults to the Id so distinct items have distinct titles (titles are
+    // a de-dup key); pass an explicit title to exercise title-based de-dup.
+    private static NewsItem Item(string id, string url, DateTimeOffset? published = null, string? title = null)
+        => new() { Id = id, Title = title ?? id, Url = new Uri(url), Source = "src", PublishedAt = published };
 
     private static NewsAggregationService Sut(params INewsSource[] sources)
         => new(sources);
@@ -57,6 +59,33 @@ public sealed class NewsAggregationServiceTests
         [
             Item("1", "https://example.com/p?id=1"),
             Item("2", "https://example.com/p?id=2"),
+        ]));
+
+        IReadOnlyList<NewsItem> result = await sut.CollectAsync();
+
+        Assert.Equal(2, result.Count);
+    }
+
+    [Fact]
+    public async Task Removes_duplicates_by_normalized_title()
+    {
+        // Different URLs, same headline (modulo case + whitespace) → one survives.
+        var sut = Sut(
+            new FakeNewsSource("a", [Item("1", "https://a.test/x", title: "Big AI News")]),
+            new FakeNewsSource("b", [Item("2", "https://b.test/y", title: "big   ai   news")]));
+
+        IReadOnlyList<NewsItem> result = await sut.CollectAsync();
+
+        Assert.Equal("1", Assert.Single(result).Id);
+    }
+
+    [Fact]
+    public async Task Keeps_items_with_distinct_titles_and_urls()
+    {
+        var sut = Sut(new FakeNewsSource("a",
+        [
+            Item("1", "https://a.test/x", title: "Title One"),
+            Item("2", "https://a.test/y", title: "Title Two"),
         ]));
 
         IReadOnlyList<NewsItem> result = await sut.CollectAsync();

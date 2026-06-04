@@ -27,17 +27,26 @@ public sealed class NewsAggregationService : INewsAggregationService
 
         // Order by Id before de-dup so the surviving representative of a duplicate
         // group is deterministic despite concurrent draining, then keep the first
-        // occurrence per canonical URL.
-        var seen = new HashSet<string>(StringComparer.Ordinal);
+        // occurrence per canonical URL OR normalized title (docs §1: dedupe by
+        // canonical URL / title hash — catches the same article ingested from two
+        // sources under different URLs but the same headline).
+        var seenUrls = new HashSet<string>(StringComparer.Ordinal);
+        var seenTitles = new HashSet<string>(StringComparer.Ordinal);
         var deduped = new List<NewsItem>();
         foreach (NewsItem item in perSource
             .SelectMany(items => items)
             .OrderBy(i => i.Id, StringComparer.Ordinal))
         {
-            if (seen.Add(CanonicalKey(item.Url)))
+            string urlKey = CanonicalKey(item.Url);
+            string titleKey = TitleKey(item.Title);
+            if (seenUrls.Contains(urlKey) || seenTitles.Contains(titleKey))
             {
-                deduped.Add(item);
+                continue;
             }
+
+            seenUrls.Add(urlKey);
+            seenTitles.Add(titleKey);
+            deduped.Add(item);
         }
 
         // Sort by publish date descending; nulls last; Id ordinal tie-break so the
@@ -70,5 +79,15 @@ public sealed class NewsAggregationService : INewsAggregationService
         string authority = url.Authority.ToLowerInvariant();
         string path = url.AbsolutePath.TrimEnd('/');
         return $"{scheme}://{authority}{path}{url.Query}";
+    }
+
+    private static string TitleKey(string title)
+    {
+        // Same-headline key: case-insensitive, whitespace-collapsed. Catches the
+        // same article surfaced under different URLs (e.g. RSS canonical link vs a
+        // Hacker News discussion/redirect link) with the same title.
+        return string.Join(
+            ' ',
+            title.ToLowerInvariant().Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
     }
 }
