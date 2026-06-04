@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Aspire app model host. The Aspire.AppHost.Sdk version is pinned in global.json. -->
+  <Sdk Name="Aspire.AppHost.Sdk" />
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <IsAspireHost>true</IsAspireHost>
+    <RootNamespace>NewsAggregator.AppHost</RootNamespace>
+    <UserSecretsId>newsaggregator-apphost-9c1f0b1a</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Hosting.AppHost" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\NewsAggregator.Web\NewsAggregator.Web.csproj" IsAspireProjectResource="true" />
+  </ItemGroup>
+
+</Project>
