@@ -1,0 +1,62 @@
+@page "/digest"
+@rendermode InteractiveServer
+@inject IDigestApplicationService DigestService
+
+<PageTitle>Digest</PageTitle>
+
+<h1>Today's Digest</h1>
+
+<button class="btn" @onclick="RefreshAsync" disabled="@_busy">
+    @(_busy ? "Refreshing…" : "Refresh digest")
+</button>
+
+@if (_status is not null)
+{
+    <p class="status">@_status</p>
+}
+
+@if (_digest is not null)
+{
+    @foreach (var section in _digest.Sections)
+    {
+        <section>
+            <h2>@section.Category</h2>
+            @if (!string.IsNullOrWhiteSpace(section.Intro))
+            {
+                <p>@section.Intro</p>
+            }
+            <ul>
+                @foreach (var item in section.Items)
+                {
+                    <li><a href="@item.Item.Url" target="_blank">@item.Item.Title</a></li>
+                }
+            </ul>
+        </section>
+    }
+}
+
+@code {
+    private bool _busy;
+    private string? _status;
+    private NewsAggregator.Core.Domain.Digest? _digest;
+
+    // The UI only invokes the application service and renders the result — no
+    // business logic lives here (docs §2.6).
+    private async Task RefreshAsync()
+    {
+        _busy = true;
+        _status = null;
+        try
+        {
+            _digest = await DigestService.RefreshDigestAsync();
+        }
+        catch (NotImplementedException)
+        {
+            _status = "Digest generation is not implemented yet (scaffold).";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}
