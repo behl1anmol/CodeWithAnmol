@@ -81,6 +81,44 @@ different URLs but same headline survives twice.
 
 ---
 
+## Request 6 — Implement HackerNewsSource (Infrastructure)
+
+Scope: only `src/NewsAggregator.Infrastructure/Sources/HackerNewsSource.cs` (replace the
+`NotImplementedException` scaffold) + new test files. No other source, no Core contract, no
+DI/config change. Plan: `.claude/plans/03-hackernews-source.md`.
+
+### Exploration (3 parallel Explore agents)
+- Scaffold already DI-wired: named client `"hackernews"` → `https://hacker-news.firebaseio.com/v0/`,
+  ctor `(IHttpClientFactory, IOptions<SourceOptions>, ILogger<HackerNewsSource>)`, singleton `INewsSource`.
+- `HackerNewsOptions`: `Enabled` (true), `MaxItems` (30), `Story` (`topstories`). Reused as-is.
+- `NewsAggregationService` is fail-fast (`Task.WhenAll`, exceptions propagate); transient resilience
+  added globally in Web `ServiceDefaultsExtensions.AddStandardResilienceHandler()` → source adds no retry.
+- No HTTP test double existed → created `FakeHttpMessageHandler`.
+- `ImplicitUsings=enable` in `src/Directory.Build.props` → `System.Net.Http`/`Linq`/`Threading` already global.
+
+### Decisions (asked user; all "recommended" chosen)
+1. **Url for url-less posts** (Ask/Show/text/job) → fall back to HN permalink
+   `https://news.ycombinator.com/item?id={id}`; external `url` used when absolute. (NewsItem.Url is required+absolute.)
+2. **Top-list endpoint failure** (post global retries) → log error + **rethrow** (don't swallow; Core fail-fast). Per-item failures caught + skipped.
+3. **Concurrency** → hardcoded `const int MaxConcurrency = 8` + `SemaphoreSlim` (keeps scope to the single file; no Core/appsettings touch).
+
+### Implemented
+- `FetchAsync` async iterator: honor `Enabled` → `GET {Story}.json` (ids) → `Take(MaxItems)` →
+  fan-out `GET item/{id}.json` bounded by `SemaphoreSlim(8)` → `Task.WhenAll` (order-preserving → deterministic ranking order) → yield non-null.
+- Helpers `FetchStoryIdsAsync` / `FetchItemAsync` / `MapToNewsItem` / `ResolveUrl` + private DTO `HackerNewsItem`.
+- **Concurrency choice**: `SemaphoreSlim`+`Task.WhenAll` over `Parallel.ForEachAsync` — need bounded concurrency *and* ordered results (determinism) *and* a per-item `NewsItem?` to filter skips; WhenAll over indexed tasks gives ordering for free.
+- **Error handling**: list-fetch error → `LogError`+rethrow (cancellation rethrown silently); per-item error (HTTP/JSON/mapping) → `LogWarning`+return null = skip, source survives; invalid payloads (null item / `deleted` / `dead` / blank title) → `LogDebug`+skip. Nothing swallowed silently.
+- **Mapping**: `Id`=id `.ToString(Invariant)`; `Title`=`title`; `Url`=external-or-permalink; `Source`=`"HackerNews"`; `Content`=`text` (null if blank); `PublishedAt`=`FromUnixTimeSeconds(time)`. JSON binds via web defaults (camelCase, case-insensitive).
+
+### Tests (new; existing untouched)
+- `Fakes/FakeHttpMessageHandler.cs` — routes by `RequestUri.AbsolutePath`, records paths, responder `Func`, 200-JSON / status helpers.
+- `Sources/HackerNewsSourceTests.cs` — 12 cases: maps top stories, permalink fallback, empty list, null list, skips deleted/dead, skips null payload, skips no-title, respects MaxItems (asserted via recorded paths), disabled = no items + zero HTTP, partial failure skips one, cancellation throws, ranking-order determinism. No live API.
+
+### Verification
+Build/test from `/tmp` (SDK pin). Infrastructure build 0 warnings / 0 errors. **88 passed, 0 failed** (76 prior + 12 new).
+
+---
+
 ## Notes / gotchas for future sessions
 - **SDK pin**: build/test from `/tmp` (or any dir without a parent `global.json`) until SDK 10.0.300 is installed. Do NOT build AppHost that way (needs `Aspire.AppHost.Sdk` msbuild-sdk from global.json).
 - **Core is BCL-only** — adding any package breaks `DependencyRuleTests` by design.

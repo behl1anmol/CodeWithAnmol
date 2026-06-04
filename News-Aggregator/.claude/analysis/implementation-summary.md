@@ -62,3 +62,41 @@ framework reference.
 SOLID (small ports, DI, no God class), no static state, no service locator, no framework coupling in
 Core, unit-test friendly (pure orchestration over ports; hand-written fakes, no mocking framework in
 new tests), deterministic output.
+
+---
+
+# Infrastructure — HackerNewsSource (same branch, later commit)
+
+Implemented `src/NewsAggregator.Infrastructure/Sources/HackerNewsSource.cs` (was a
+`NotImplementedException` scaffold). Plan: `.claude/plans/03-hackernews-source.md`. Scope: that one
+source file + 2 new test files. No Core contract, no `SourceOptions`, no DI/config change.
+
+| File | Change |
+|------|--------|
+| `src/NewsAggregator.Infrastructure/Sources/HackerNewsSource.cs` | implemented `FetchAsync` + helpers + DTO |
+| `src/NewsAggregator.Tests/Fakes/FakeHttpMessageHandler.cs` | new — routes by path, records requests |
+| `src/NewsAggregator.Tests/Sources/HackerNewsSourceTests.cs` | new — 12 tests |
+
+### Algorithm
+`Enabled` gate → `GET {Story}.json` (ids, ranking order) → `Take(MaxItems)` → fan-out
+`GET item/{id}.json` bounded by `SemaphoreSlim(8)` → `Task.WhenAll` (preserves order → deterministic) →
+map → yield non-null.
+
+### Decisions (asked user)
+1. Url for url-less posts → HN permalink `…/item?id={id}` (external url when absolute).
+2. Top-list failure → log + rethrow (Core fail-fast); per-item failure → skip.
+3. Concurrency → hardcoded `const MaxConcurrency = 8` + `SemaphoreSlim` (single-file scope).
+
+### Concurrency rationale
+`SemaphoreSlim` + `Task.WhenAll` over `Parallel.ForEachAsync`: need bounded concurrency **and**
+order-preserving results (determinism) **and** per-item `NewsItem?` to filter skips; WhenAll over
+indexed tasks gives ordering for free. No sequential download.
+
+### Error handling
+List endpoint error → `LogError`+rethrow (cancellation rethrown silently); per-item error → `LogWarning`+skip (source survives); invalid payloads (null/`deleted`/`dead`/blank title) → `LogDebug`+skip. Nothing swallowed.
+
+### Mapping (NewsItem unchanged)
+`Id`=id `.ToString(Invariant)`; `Title`=`title`; `Url`=external-or-permalink; `Source`=`"HackerNews"`; `Content`=`text` (null if blank); `PublishedAt`=`FromUnixTimeSeconds(time)`. Binds via JSON web defaults (camelCase, case-insensitive).
+
+### Test result
+**88 passed, 0 failed** (76 prior + 12 new). No live HN API calls — all HTTP via `FakeHttpMessageHandler`.
