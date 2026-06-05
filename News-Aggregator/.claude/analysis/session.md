@@ -169,6 +169,16 @@ Atom parsed. All offline via `FakeHttpMessageHandler`, deterministic.
 Installed SDK 10.0.300 → `dotnet build` Infrastructure 0/0; `dotnet test` **102 passed,
 0 failed** (88 prior + 14 new). Zero live network calls.
 
+### Request 8 — PR #5 review (P2): enforce per-feed timeout during body read
+Reviewer (Codex): with `ResponseHeadersRead`, `ReadAsStreamAsync` + synchronous
+`SyndicationFeed.Load` read the live body without observing `linked.Token`, so a server
+stalling mid-body bypasses `TimeoutSeconds` and holds a concurrency slot. **Valid.** Fix:
+buffer the body via `ReadAsByteArrayAsync(linked.Token)` (download now covered by the
+deadline), then `ParseFeed(byte[])` over a `MemoryStream` (in-memory, no network). Added
+`Slow_body_after_headers_hits_per_feed_timeout_and_is_isolated` using a `StallingHttpContent`
+test double (headers immediate, body blocks until the read token cancels) + `TimeoutSeconds=1`.
+`dotnet test` **103 passed, 0 failed**.
+
 ---
 
 ## Notes / gotchas for future sessions

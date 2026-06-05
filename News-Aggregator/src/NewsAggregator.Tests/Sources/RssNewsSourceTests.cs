@@ -256,6 +256,24 @@ public sealed class RssNewsSourceTests
         Assert.Equal(["b1"], result.Select(i => i.Id));
     }
 
+    [Fact]
+    public async Task Slow_body_after_headers_hits_per_feed_timeout_and_is_isolated()
+    {
+        // Feed A sends headers promptly but then stalls while streaming the body. The per-feed
+        // TimeoutSeconds must still fire during the body read (regression guard: it previously
+        // would not, because SyndicationFeed.Load read the live stream without the token).
+        var handler = Router(new()
+        {
+            [FeedAPath] = () => new HttpResponseMessage(HttpStatusCode.OK) { Content = new StallingHttpContent() },
+            [FeedBPath] = () => Ok(Rss(RssItem(id: "b1", title: "B1", link: "https://example.com/b1"))),
+        });
+        var sut = BuildSut(handler, [FeedAUrl, FeedBUrl], new RssOptions { TimeoutSeconds = 1 });
+
+        List<NewsItem> result = await DrainAsync(sut);
+
+        Assert.Equal(["b1"], result.Select(i => i.Id));
+    }
+
     // ---- 6. caller cancellation ---------------------------------------------
 
     [Fact]
@@ -328,5 +346,24 @@ public sealed class RssNewsSourceTests
         Assert.Equal("Atom entry", item.Title);
         Assert.Equal(new Uri("https://example.com/atom/1"), item.Url);
         Assert.Equal("atom body", item.Content);
+    }
+
+    // HttpContent that returns headers immediately but never finishes streaming its body,
+    // unblocking only when the read's cancellation token fires — i.e. a server that stalls
+    // mid-body. Used to prove the per-feed deadline covers the body read.
+    private sealed class StallingHttpContent : HttpContent
+    {
+        protected override Task SerializeToStreamAsync(
+            Stream stream, TransportContext? context, CancellationToken cancellationToken)
+            => Task.Delay(Timeout.Infinite, cancellationToken);
+
+        protected override Task SerializeToStreamAsync(Stream stream, TransportContext? context)
+            => Task.Delay(Timeout.Infinite);
+
+        protected override bool TryComputeLength(out long length)
+        {
+            length = 0;
+            return false;
+        }
     }
 }

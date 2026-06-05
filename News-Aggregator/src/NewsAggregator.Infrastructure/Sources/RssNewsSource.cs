@@ -122,8 +122,12 @@ public sealed class RssNewsSource : INewsSource
                 await client.GetAsync(feed, HttpCompletionOption.ResponseHeadersRead, linked.Token);
             response.EnsureSuccessStatusCode();
 
-            await using Stream stream = await response.Content.ReadAsStreamAsync(linked.Token);
-            SyndicationFeed parsed = ParseFeed(stream);
+            // Buffer the whole body under the linked token so the per-feed timeout also
+            // covers a server that sends headers promptly but then streams the XML slowly.
+            // SyndicationFeed.Load is synchronous and would otherwise read the live network
+            // stream without observing the deadline; parsing from memory avoids that.
+            byte[] payload = await response.Content.ReadAsByteArrayAsync(linked.Token);
+            SyndicationFeed parsed = ParseFeed(payload);
 
             int take = Math.Max(0, _options.MaxItemsPerFeed);
             var items = new List<NewsItem>();
@@ -157,12 +161,13 @@ public sealed class RssNewsSource : INewsSource
         }
     }
 
-    private static SyndicationFeed ParseFeed(Stream stream)
+    private static SyndicationFeed ParseFeed(byte[] payload)
     {
-        // SyndicationFeed.Load auto-detects RSS 2.0 and Atom 1.0. The reader is non-async
-        // but operates over the already-buffered network stream; the awaited network reads
-        // above are where cancellation matters.
-        using XmlReader reader = XmlReader.Create(stream, new XmlReaderSettings { CloseInput = false });
+        // SyndicationFeed.Load auto-detects RSS 2.0 and Atom 1.0. It runs synchronously over
+        // the in-memory buffer (no network), so the per-feed deadline is enforced during the
+        // awaited body download above, not here.
+        using var stream = new MemoryStream(payload, writable: false);
+        using XmlReader reader = XmlReader.Create(stream);
         return SyndicationFeed.Load(reader);
     }
 
