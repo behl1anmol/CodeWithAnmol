@@ -31,7 +31,14 @@ public static class DigestComposer
                 .ThenBy(item => item.Item.Title, StringComparer.Ordinal)
                 // GroupBy preserves first-appearance order of groups and within-group order,
                 // so the highest-scoring item of each category anchors its section's rank.
-                .GroupBy(item => item.Category, StringComparer.Ordinal)
+                // Group case-insensitively so all three category comparers agree — this one,
+                // EditorIntroParser's intro map, and the workflow's intro lookup all use
+                // OrdinalIgnoreCase. Categories already arrive canonical from the Categorizer
+                // (Taxonomy.Normalize), so this changes nothing today; it just prevents a
+                // hypothetical "AI"/"ai" split from producing a section the intro map (keyed
+                // OrdinalIgnoreCase) could never match. group.Key takes the first item's
+                // (canonical) casing.
+                .GroupBy(item => item.Category, StringComparer.OrdinalIgnoreCase)
                 .Select(group => new DigestSection
                 {
                     Category = group.Key,

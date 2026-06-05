@@ -91,6 +91,10 @@ public sealed class SequentialEditorialWorkflow : IEditorialWorkflow
         // AgentResponseUpdateEvents so we can stream composing progress.
         await run.TrySendMessageAsync(new TurnToken(emitEvents: true));
 
+        // The composing payload is constant, so build it once instead of allocating a fresh
+        // AgentProgress per streamed delta.
+        var composing = new AgentProgress { Role = AgentRole.Editor, Stage = "composing" };
+
         var reply = new StringBuilder();
         await foreach (WorkflowEvent workflowEvent in run.WatchStreamAsync(cancellationToken))
         {
@@ -100,17 +104,16 @@ public sealed class SequentialEditorialWorkflow : IEditorialWorkflow
                 continue;
             }
 
+            // Skip empty-text deltas (e.g. the terminal update) so progress tracks actual
+            // streamed content rather than every framework event.
             string? text = update.Update?.Text;
-            if (!string.IsNullOrEmpty(text))
+            if (string.IsNullOrEmpty(text))
             {
-                reply.Append(text);
+                continue;
             }
 
-            progress?.Report(new AgentProgress
-            {
-                Role = AgentRole.Editor,
-                Stage = "composing",
-            });
+            reply.Append(text);
+            progress?.Report(composing);
         }
 
         // WatchStreamAsync ends without throwing on cancellation, so surface a genuine
