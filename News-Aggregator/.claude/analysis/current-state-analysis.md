@@ -168,8 +168,11 @@ prompt repeats the relevant ones, but they apply globally:
   Core port signature forces a Web composition-root edit — keep changes additive).
 - **Accuracy policy** (docs README): any Agent Framework / Aspire / OpenAI API whose exact
   signature can drift between versions is marked ⚠️ and **must be verified against the installed
-  package** (Agent Framework `1.8.0`, `Microsoft.Extensions.AI` `10.6.0`, Aspire `13.4.0`,
-  `OllamaSharp` v4+) before coding. **No hallucinated APIs.**
+  package** before coding. The authoritative versions are `src/Directory.Packages.props` +
+  `src/global.json` (**not** the `docs/` chapters, which pinned older 1.8.0/13.4.0 values the code
+  corrected): Agent Framework `1.9.0`, `Microsoft.Extensions.AI` `10.6.0`,
+  `Aspire.Hosting.AppHost`/`Aspire.AppHost.Sdk` `13.4.2`, `OllamaSharp` `5.4.25`, `OpenAI` `2.10.0`.
+  **No hallucinated APIs.**
 - **Determinism** — all non-LLM logic (parsing, sort, group, filter) is pure and unit-tested with
   fakes (`FakeChatClient`, `FakeHttpMessageHandler`); no live network/model calls in tests.
 - **SDK pin** — build/test with SDK `10.0.300`. AppHost must be built with the real SDK (needs the

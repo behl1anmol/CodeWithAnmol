@@ -26,11 +26,15 @@ Repeat-after-me constraints, enforced in each prompt's Definition of Done:
    non-trivial logic goes into a pure, unit-tested helper.
 4. **Additive changes only** unless the prompt explicitly scopes a signature change. Changing a Core
    port signature forces a Web composition-root edit — avoid it.
-5. **No hallucinated APIs (docs accuracy policy).** Pinned versions: Agent Framework **1.8.0**
-   (`Microsoft.Agents.AI`, `.Workflows`, `.OpenAI`), `Microsoft.Extensions.AI` **10.6.0**, Aspire
-   **13.4.0**, `OllamaSharp` v4+. Any method marked ⚠️ below **must be verified against the
-   installed package** (read the assembly / IntelliSense / `microsoft_docs_search`) before you
-   write it. If a verified signature differs from what's shown here, follow the package and note it.
+5. **No hallucinated APIs (docs accuracy policy).** The **authoritative** version source is the
+   repo's `src/Directory.Packages.props` (+ `src/global.json` for the Aspire AppHost SDK) — **not**
+   the `docs/` chapters, which pinned older values (`docs/05` says 1.8.0/13.4.0; the code corrected
+   them). As pinned today: Agent Framework **1.9.0** (`Microsoft.Agents.AI`, `.Workflows`, `.OpenAI`),
+   `Microsoft.Extensions.AI` **10.6.0**, `Aspire.Hosting.AppHost` / `Aspire.AppHost.Sdk` **13.4.2**,
+   `OllamaSharp` **5.4.25**, `OpenAI` **2.10.0**. Before writing, re-read `Directory.Packages.props`
+   (versions can move again) and verify any method marked ⚠️ against the **installed** package (read
+   the assembly / IntelliSense / `microsoft_docs_search`). If a verified signature differs from what's
+   shown here, follow the package and note it.
 6. **Deterministic, offline tests.** Use `FakeChatClient` (deterministic `IChatClient`) and
    `FakeHttpMessageHandler`. No live model or network calls in tests.
 7. **SDK pin = 10.0.300.** Build/test with that SDK. Build the **AppHost with the real SDK on PATH**
@@ -125,7 +129,7 @@ progress, and bound cross-article parallelism by `EnrichmentOptions.MaxDegreeOfP
   backed by `FakeChatClient` with role-specific canned replies (reuse the existing `FakeChatClient`).
 - **New** `src/NewsAggregator.Tests/Workflows/ConcurrentEnrichmentWorkflowTests.cs`.
 
-**Implementation (verify ⚠️ APIs against `Microsoft.Agents.AI.Workflows` 1.8.0 first).**
+**Implementation (verify ⚠️ APIs against the installed `Microsoft.Agents.AI.Workflows` — 1.9.0 per `Directory.Packages.props` — first).**
 1. For each `NewsItem`, build the agent set from `_agentFactory.CreateAgent(AgentRole.Summarizer
    /Categorizer/Ranker)`.
 2. ⚠️ `Workflow wf = AgentWorkflowBuilder.BuildConcurrent(agents, aggregator)` where `aggregator` is
@@ -184,7 +188,7 @@ intro per section → assemble the final `Digest`.
   (reuse `FakeAgentFactory` from P2 if present; otherwise add a minimal local fake — keep it
   self-contained so this prompt is buildable even if P2 is not yet merged).
 
-**Implementation (verify ⚠️ APIs against `Microsoft.Agents.AI.Workflows` 1.8.0 first).**
+**Implementation (verify ⚠️ APIs against the installed `Microsoft.Agents.AI.Workflows` — 1.9.0 per `Directory.Packages.props` — first).**
 1. `DigestComposer` produces deterministic, intro-less sections (pure; no LLM).
 2. ⚠️ Editorial pipeline: docs §3.4 says use `AgentWorkflowBuilder.BuildSequential(agents)` when
    all-agents, or `WorkflowBuilder` + `AddEdge(...)` when mixing deterministic executors with the
@@ -309,7 +313,7 @@ collect → enrich → compose end-to-end through the real workflows with fakes.
 - (Possibly **New**) a tiny `appsettings`/AppHost wiring note documenting the model name source.
 
 **Implementation.**
-1. **Model bootstrap (verify ⚠️ Aspire 13.4.0 API first).** The Ollama runtime is a first-party
+1. **Model bootstrap (verify ⚠️ the installed Aspire API first — 13.4.2 per `Directory.Packages.props`/`global.json`).** The Ollama runtime is a first-party
    generic container (`AddContainer("ollama", "ollama/ollama")`) — Aspire has **no** first-party
    Ollama model-pull integration (docs §6.1). Choose **one** verified approach and confirm it with
    `microsoft_docs_search`/the Aspire API before coding:
