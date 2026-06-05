@@ -115,6 +115,23 @@ the `BuildConcurrent` aggregator.
 > in telemetry) is a reasonable *future* additive change, but it's outside P2's file scope and
 > not required — routing by `.Id` is exact and self-contained.
 
+## 4a. Agent lifetime — reuse, don't allocate per request
+
+`AIAgent` / `ChatClientAgent` are **stateless across runs and safe to reuse concurrently**
+(probed: 8 concurrent `BuildConcurrent` workflows sharing the *same* 3 agent instances →
+0 errors, correct per-run routing). They are **not** `IDisposable`, and they do **not** own
+or dispose the injected `IChatClient`.
+
+Each `IChatClient` the agent factory builds owns an HTTP-level pipeline (e.g. an
+`OllamaApiClient` with its own `HttpClient`). Those are meant to be **long-lived**, so:
+
+- **Cache one agent per role** in the (singleton) `AgentFrameworkAgentFactory` and reuse it
+  for the app lifetime. Building a fresh agent (hence a fresh `IChatClient` + `HttpClient`)
+  per article — or worse, per agent per article — retains provider/HTTP resources on every
+  digest refresh. (This was a real review finding on P2.)
+- Because the agents are stable singletons, routing-by-`Id` is unaffected: each workflow run
+  still maps the 3 role ids to roles for its own event stream.
+
 ## 5. Disposal & cancellation
 
 - **`StreamingRun` is `IAsyncDisposable`** (it exposes `DisposeAsync`, no sync `Dispose`).

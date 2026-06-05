@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.Agents.AI;
 using Microsoft.Extensions.AI;
 using NewsAggregator.Core.Domain;
@@ -9,7 +10,9 @@ namespace NewsAggregator.Tests.Fakes;
 /// Deterministic <see cref="IAgentFactory"/> that backs each role with a canned reply, so
 /// the concurrent/sequential workflows can be unit-tested without a live model. Agents are
 /// left unnamed (mirroring <c>AgentFrameworkAgentFactory</c>), so each carries a unique
-/// <see cref="AIAgent.Id"/> the workflow can route updates by.
+/// <see cref="AIAgent.Id"/> the workflow can route updates by, and they are <b>cached
+/// one-per-role</b> exactly like the real factory — so tests exercise the same reuse path
+/// (the same agent instance shared across concurrent per-article runs).
 /// </summary>
 /// <remarks>
 /// The optional <c>clientFactory</c> lets a test substitute the backing
@@ -20,6 +23,7 @@ public sealed class FakeAgentFactory : IAgentFactory
 {
     private readonly Dictionary<AgentRole, string> _replies;
     private readonly Func<AgentRole, string, IChatClient> _clientFactory;
+    private readonly ConcurrentDictionary<AgentRole, Lazy<AIAgent>> _agents = new();
 
     public FakeAgentFactory(
         string summary,
@@ -43,6 +47,12 @@ public sealed class FakeAgentFactory : IAgentFactory
     }
 
     public AIAgent CreateAgent(AgentRole role)
+        => _agents.GetOrAdd(
+            role,
+            r => new Lazy<AIAgent>(() => BuildAgent(r), LazyThreadSafetyMode.ExecutionAndPublication))
+            .Value;
+
+    private AIAgent BuildAgent(AgentRole role)
     {
         string reply = _replies.TryGetValue(role, out string? value) ? value : string.Empty;
         return new ChatClientAgent(_clientFactory(role, reply), instructions: role.ToString());

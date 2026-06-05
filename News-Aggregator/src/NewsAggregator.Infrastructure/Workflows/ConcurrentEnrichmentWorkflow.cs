@@ -91,7 +91,9 @@ public sealed class ConcurrentEnrichmentWorkflow : IEnrichmentWorkflow
         ProgressReporter reporter,
         CancellationToken cancellationToken)
     {
-        // Fresh agents per item so each carries a unique AIAgent.Id within this run.
+        // Resolve the role agents. The factory caches them (agents are long-lived and safe
+        // to reuse across concurrent runs), so this is cheap; we map each agent's AIAgent.Id
+        // to its role to route THIS run's streamed updates back to the right buffer.
         AIAgent summarizer = _agentFactory.CreateAgent(AgentRole.Summarizer);
         AIAgent categorizer = _agentFactory.CreateAgent(AgentRole.Categorizer);
         AIAgent ranker = _agentFactory.CreateAgent(AgentRole.Ranker);
