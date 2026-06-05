@@ -32,9 +32,19 @@ public static class InfrastructureServiceCollectionExtensions
         services.AddHttpClient(HackerNewsSource.HttpClientName, client =>
             client.BaseAddress = new Uri("https://hacker-news.firebaseio.com/v0/"));
         services.AddHttpClient(RssNewsSource.HttpClientName);
+        services.AddHttpClient(GitHubNewsSource.HttpClientName, client =>
+        {
+            client.BaseAddress = new Uri("https://api.github.com/");
+            // GitHub rejects API requests without a User-Agent; the others pin the JSON
+            // media type and API version so responses stay stable across server-side changes.
+            client.DefaultRequestHeaders.UserAgent.ParseAdd("NewsAggregator");
+            client.DefaultRequestHeaders.Accept.ParseAdd("application/vnd.github+json");
+            client.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
+        });
 
         services.AddSingleton<INewsSource, HackerNewsSource>();
         services.AddSingleton<INewsSource, RssNewsSource>();
+        services.AddSingleton<INewsSource, GitHubNewsSource>();
     }
 
     private static void AddModelProviders(this IServiceCollection services)
