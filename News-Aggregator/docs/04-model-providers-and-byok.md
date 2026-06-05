@@ -63,15 +63,15 @@ graph LR
 Use the **`OllamaSharp`** package ✅ — the client the official .NET AI *“Chat with a
 local AI model”* quickstart uses. **`Microsoft.Extensions.AI.Ollama` is deprecated; do
 not use it.** `OllamaSharp`'s `OllamaApiClient` implements
-`Microsoft.Extensions.AI.IChatClient` (v4+), so the Agent Framework's
+`Microsoft.Extensions.AI.IChatClient` (v4+; the repo pins `5.4.25`), so the Agent Framework's
 `IChatClient.AsAIAgent(...)` (or `new ChatClientAgent(...)`) builds an agent directly
 from it. **No Community Toolkit is required.**
 
 ```csharp
-// Illustrative — pin OllamaSharp v4+ (see §5.0).
+// Illustrative — OllamaSharp pinned at 5.4.25 (see §5.0).
 using Microsoft.Agents.AI;       // ✅ AIAgent, ChatClientAgent, AsAIAgent
 using Microsoft.Extensions.AI;   // ✅ IChatClient
-using OllamaSharp;               // ✅ OllamaApiClient (implements IChatClient, v4+)
+using OllamaSharp;               // ✅ OllamaApiClient (implements IChatClient; v4+, repo pins 5.4.25)
 
 IChatClient chatClient = new OllamaApiClient(
     new Uri("http://localhost:11434"),   // Ollama default port ✅
@@ -89,7 +89,7 @@ is built — keeping telemetry/function-invocation uniform.
 Notes (verified):
 - `OllamaSharp` is third-party but is the **Microsoft-recommended** Ollama client for
   .NET; `Microsoft.Extensions.AI.Ollama` is **deprecated**.
-- `OllamaApiClient` implements `IChatClient` from OllamaSharp **v4+** ✅ — pin v4+.
+- `OllamaApiClient` implements `IChatClient` from OllamaSharp **v4+** ✅ — repo pins `5.4.25`.
 - Ollama default endpoint is `http://localhost:11434` ✅.
 - **Not all local models support tool/function calling.** For agents that use tools
   or structured output, use models known to support it (e.g. `llama3.2`, `qwen3`).

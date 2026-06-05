@@ -55,7 +55,7 @@ Supporting rules (from the brief), and where they're enforced:
 - **Why:** `OllamaSharp` is the client used by the official .NET AI *Chat with a local
   AI model* quickstart; `Microsoft.Extensions.AI.Ollama` is **deprecated**. Because
   `OllamaApiClient` is an `IChatClient`, agents/workflows are unaffected by the choice.
-- **Cost:** one third-party dependency (`OllamaSharp`, pin v4+). Aspire has no
+- **Cost:** one third-party dependency (`OllamaSharp`, pinned `5.4.25`). Aspire has no
   first-party Ollama *hosting* integration, so hosting is a generic container (slightly
   more wiring). *Alternative:* run Ollama on the host and configure the endpoint.
 

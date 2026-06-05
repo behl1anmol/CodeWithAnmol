@@ -181,8 +181,83 @@ test double (headers immediate, body blocks until the read token cancels) + `Tim
 
 ---
 
+## Request 9 — Current-state analysis + MVP-completion prompt plan (no code build)
+
+**Branch:** `claude/news-aggregator-analysis-MrbTS` (off `main`). **Date:** 2026-06-05.
+Task: analyse how far the implementation is vs the MVP in `docs/`, decompose the remaining work
+into independently-buildable numbered prompts, and persist them so future sessions can build by
+prompt number. No application code changed this session — documentation only.
+
+### Deliverables
+- **New** `.claude/analysis/current-state-analysis.md` — verified DONE/NOT-DONE inventory (read from
+  source, not assumed), the gap-to-DoD table (G1–G8) mapped to prompts, sequencing DAG rationale,
+  deviation register, and the post-MVP exclusions.
+- **New** `.claude/prompts/mvp-completion-prompts.md` — six self-contained prompts (P1–P6) with
+  goal / prerequisites / file scope / steps / constraints / Definition-of-Done each, a dependency
+  graph, global rules, and verification commands.
+
+### Decisions (asked user; constraint C — no assumptions)
+1. **Plan scope** → **MVP Definition-of-Done only** (docs §7.5). Post-MVP roadmap excluded, listed
+   for reference only.
+2. **`GitHubNewsSource`** (a 3rd source, not in MVP docs §1.2/§1.5 which name only HN+RSS) →
+   **keep it, document the deviation.** The remaining pipeline is source-count-agnostic (consumes
+   the deduped `NewsItem[]`, groups by LLM category, not by source), so no prompt special-cases it.
+3. **Prompt independence** → **sequential DAG, green at every step**; each prompt self-contained
+   with explicit prerequisites; full suite must stay green to avoid an enhancement/bug-fix loop
+   (constraint F).
+
+### Gap found (the only NOT-DONE work to reach MVP DoD)
+G1 agent-output→`EnrichedItem` mapper (missing) · G2 placeholder agent prompts · G3
+`ConcurrentEnrichmentWorkflow` = `NotImplementedException` · G4 `SequentialEditorialWorkflow` =
+`NotImplementedException` · G5 UI: no live progress, scaffold `catch (NotImplementedException)`, no
+category/tag filtering · G6 no model-provider health check · G7 AppHost never pulls the Ollama
+model (single `dotnet run` can't produce a digest) · G8 no workflow smoke test. Everything else
+(5 projects, Core, 3 source adapters, providers, DI, composition root, AppHost wiring) is **done**;
+last recorded run **119 passed, 0 failed**.
+
+### Prompt map
+P1 enrichment contract + Core mapper → P2 concurrent workflow & P3 sequential workflow → P4 Blazor
+(progress + real refresh + filtering) & P6 AppHost model bootstrap + e2e smoke test; P5 provider
+health check is independent.
+
+---
+
+## Request 10 — PR #7 review fix + docs version reconciliation
+
+**Branch:** `claude/news-aggregator-analysis-MrbTS`. **Date:** 2026-06-05. Documentation only.
+
+Codex review comment on PR #7 (`discussion_r3360542081`) flagged that the new prompt doc cited
+stale pinned versions. **Verified against source — the reviewer was correct.** Actual repo pins:
+
+| Package | Docs originally said | Repo actually pins (authoritative) |
+|---------|----------------------|------------------------------------|
+| `Microsoft.Agents.AI*` | `1.8.0` | **`1.9.0`** (`Directory.Packages.props`) |
+| `Aspire.Hosting.AppHost` | `13.4.0` | **`13.4.2`** (`Directory.Packages.props`) |
+| `Aspire.AppHost.Sdk` | `13.4.0` | **`13.4.2`** (`global.json`) |
+| `Microsoft.Extensions.ServiceDiscovery` | `13.4.0` (grouped w/ Aspire) | **`10.6.0`** (tracks .NET 10 line) |
+| `OllamaSharp` | `v4+` | **`5.4.25`** |
+| `OpenAI` | (unversioned) | **`2.10.0`** |
+| `Microsoft.Extensions.AI*` | `10.6.0` | `10.6.0` ✅ (unchanged) |
+
+### Fixes
+- **Commit `195235a`** — corrected `.claude/prompts/mvp-completion-prompts.md` (global rule 5, P2/P3
+  workflow notes, P6 AppHost note) and `.claude/analysis/current-state-analysis.md`; made
+  `Directory.Packages.props` + `global.json` the **authoritative** source (prompts now say to
+  re-read those before coding) so numbers can't go stale again. Replied to the thread + resolved it.
+- **This commit** — reconciled the `docs/` MVP chapters too (user asked): `docs/README` pinned-version
+  block, `docs/05 §5.0` version tables (+ an "authoritative source" note and the ServiceDiscovery
+  .NET-10-line callout), `docs/05 §5.1` OllamaSharp row, and the `v4+` mentions in `docs/04`/`docs/07`.
+  Historical "originally targeted 1.8.0/13.4.0" notes are left intentionally for traceability.
+
+### Gotcha recorded
+The `docs/` chapters are the *design intent*; `src/Directory.Packages.props` + `src/global.json` are
+the *source of truth* for versions. When they disagree, trust the repo files and reconcile the docs.
+
+---
+
 ## Notes / gotchas for future sessions
 - **SDK pin**: build/test from `/tmp` (or any dir without a parent `global.json`) until SDK 10.0.300 is installed. Do NOT build AppHost that way (needs `Aspire.AppHost.Sdk` msbuild-sdk from global.json).
+- **Versions**: authoritative = `src/Directory.Packages.props` + `src/global.json` (Agent Framework `1.9.0`, M.E.AI `10.6.0`, Aspire hosting `13.4.2`, ServiceDiscovery `10.6.0`, `OllamaSharp` `5.4.25`, `OpenAI` `2.10.0`), **not** the `docs/` chapters' original targets.
 - **Core is BCL-only** — adding any package breaks `DependencyRuleTests` by design.
 - Cannot change service ctor signatures without editing the Web composition root (out of allowed scope).
 - `ArgumentException.ThrowIfNullOrWhiteSpace(null)` throws `ArgumentNullException` (subclass) → use `Assert.ThrowsAny<ArgumentException>` in mixed null/blank theories.

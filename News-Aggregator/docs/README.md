@@ -29,18 +29,22 @@ accompanied by an alternative. Use the legend below throughout the docs:
 | ⚠️ | Real, but **version / exact option must be re-verified** at implementation time (preview→GA churn). |
 | ❓ | **Uncertain** — an alternative is provided; confirm before coding. |
 
-> **Pinned versions (read first):** This design targets these exact versions —
-> manage them centrally (`Directory.Packages.props`) so they can't drift:
-> - **Microsoft Agent Framework — `1.8.0`** (all aligned): `Microsoft.Agents.AI`,
+> **Pinned versions (read first):** The authoritative source is
+> `src/Directory.Packages.props` (+ `src/global.json` for the `Aspire.AppHost.Sdk`); those
+> files win if this list drifts. Reconciled with the repo on 2026-06-05 (the design
+> originally targeted Agent Framework `1.8.0` / Aspire `13.4.0`, advanced in code to the
+> nearest current stable):
+> - **Microsoft Agent Framework — `1.9.0`** (all aligned): `Microsoft.Agents.AI`,
 >   `Microsoft.Agents.AI.Workflows`, `Microsoft.Agents.AI.OpenAI`.
 > - **Microsoft.Extensions.AI — `10.6.0`**: `Microsoft.Extensions.AI`,
 >   `Microsoft.Extensions.AI.Abstractions`, **`Microsoft.Extensions.AI.OpenAI`**
 >   (ships `AsIChatClient()` — required for the OpenRouter/OpenAI adapter route).
-> - **`.NET Aspire` — `13.4.0`**: `Aspire.Hosting.AppHost`, `Aspire.AppHost.Sdk`,
->   `Microsoft.Extensions.ServiceDiscovery`, `Aspire.Hosting.Redis` (optional),
->   `Aspire.StackExchange.Redis.DistributedCaching` (optional).
-> - **Local LLM** — `OllamaSharp` (v4+); **`Microsoft.Extensions.AI.Ollama` is
->   deprecated** and is *not* used.
+> - **`.NET Aspire` hosting — `13.4.2`**: `Aspire.Hosting.AppHost`, `Aspire.AppHost.Sdk`.
+>   `Aspire.Hosting.Redis` / `Aspire.StackExchange.Redis.DistributedCaching` are optional
+>   and **not referenced** (Redis deferred). Note `Microsoft.Extensions.ServiceDiscovery`
+>   tracks the **.NET 10** line and is pinned at **`10.6.0`**, not the Aspire line.
+> - **Provider clients** — `OllamaSharp` `5.4.25` and `OpenAI` `2.10.0`;
+>   **`Microsoft.Extensions.AI.Ollama` is deprecated** and is *not* used.
 >
 > Note the **two independent version lines**: Agent Framework is on `1.x`, while
 > `Microsoft.Extensions.AI` follows the `10.x` (.NET 10) line — they are *not* meant
