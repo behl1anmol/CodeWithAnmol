@@ -40,7 +40,8 @@ not re-measured.
 
 ## 3. What is DONE (verified against source)
 
-Last recorded test run: **119 passed, 0 failed** (`.claude/plans/05-github-source.md`).
+Last recorded test run: **143 passed, 0 failed** (P1, `.claude/plans/06-p1-enrichment-contract.md`;
+was 119 before P1).
 
 ### 3.1 Solution & build plumbing — ✅ complete
 - Five projects exactly (`AppHost`, `Web`, `Core`, `Infrastructure`, `Tests`) — matches docs §2.1.
@@ -55,6 +56,9 @@ Last recorded test run: **119 passed, 0 failed** (`.claude/plans/05-github-sourc
 - **Application:** `NewsAggregationService.CollectAsync` (concurrent drain → dedupe by canonical
   URL **or** normalized title → publish-date-desc sort) and `DigestApplicationService`
   (orchestrates collect → enrich → compose → cache, reports `AgentProgress`).
+- **Application/Enrichment (P1):** `Taxonomy` (closed category set + `Normalize`),
+  `CategoryResult`/`RelevanceResult` POCOs, and the pure, **total** `EnrichedItemAssembler`
+  (raw agent replies → valid `EnrichedItem`, never throws). BCL-only (`System.Text.Json` only).
 - **Ports:** `INewsSource`, `INewsAggregationService`, `IEnrichmentWorkflow`,
   `IEditorialWorkflow`, `IChatModelProvider`, `IDigestCache`, `IDigestApplicationService`.
 - `DependencyRuleTests` enforces Core has **no** framework/provider references.
@@ -66,7 +70,9 @@ Last recorded test run: **119 passed, 0 failed** (`.claude/plans/05-github-sourc
   override → default fallback), `ChatClientFactory` (provider switch → `IChatClient` pipeline
   `.AsBuilder().UseFunctionInvocation().UseOpenTelemetry().Build(sp)`), `IChatClientFactory`.
 - **Agents:** `AgentFrameworkAgentFactory` builds a `ChatClientAgent` per role.
-  `AgentInstructions` holds **placeholder** prompts (no structured-output contract yet).
+  `AgentInstructions` — Summarizer/Categorizer/Ranker now emit the P1 contract (plain text /
+  strict JSON, taxonomy sourced from `Taxonomy.Categories`); the Editor prompt is still a
+  placeholder (refined in P3).
 - **Caching:** `InMemoryDigestCache`.
 - **DI:** `InfrastructureServiceCollectionExtensions` wires all of the above (named HTTP clients,
   provider selection from config, agents, workflows, cache).
@@ -82,9 +88,10 @@ Last recorded test run: **119 passed, 0 failed** (`.claude/plans/05-github-sourc
   `Models__Ollama__Endpoint`, `WaitFor(ollama)`. Redis deferred (commented, post-MVP).
 
 ### 3.6 Tests (`NewsAggregator.Tests`) — ⚠️ complete for what exists
-- Domain, application-orchestration, and all three source adapters covered.
+- Domain, application-orchestration, all three source adapters, and the P1
+  `EnrichedItemAssembler` covered (`Tests/Application/EnrichedItemAssemblerTests.cs`).
 - `FakeChatClient` (deterministic `IChatClient`) and `FakeHttpMessageHandler` exist and are ready
-  for workflow tests. **No workflow or UI tests yet** (the workflows are not implemented).
+  for workflow tests. **No workflow or UI tests yet** (those workflows are not implemented).
 
 ---
 
@@ -94,8 +101,8 @@ Each gap below cites the file and the doc clause it satisfies. These map 1:1 ont
 
 | # | Gap | Evidence (file) | Doc clause | Prompt |
 |---|-----|-----------------|------------|--------|
-| G1 | **Agent-output → `EnrichedItem` mapping** is undefined. The aggregator that turns three agent replies into one `EnrichedItem` (summary / category+tags / score+reason) does not exist, and there is no parsing contract. | — (missing) | §3.3 ("small Core mapper … framework-free") | **P1** |
-| G2 | **Agent prompts are placeholders** with no structured-output contract for Categorizer/Ranker. | `Agents/AgentInstructions.cs` (`TODO(scaffold)`) | §3.2, §3.3 | **P1** (enrichment), **P3** (Editor) |
+| ~~G1~~ | ✅ **DONE (P1).** `Core/Application/Enrichment/EnrichedItemAssembler.cs` + `Taxonomy` + `CategoryResult`/`RelevanceResult` — pure, total mapper from three agent replies to a valid `EnrichedItem`. | `Core/Application/Enrichment/*` | §3.3 ("small Core mapper … framework-free") | **P1** ✅ |
+| G2 | ✅ **Enrichment prompts DONE (P1)** (Summarizer/Categorizer/Ranker emit the contract); Editor prompt still a placeholder. | `Agents/AgentInstructions.cs` | §3.2, §3.3 | **P1** ✅ (enrichment), **P3** (Editor) |
 | G3 | **Concurrent enrichment workflow not implemented.** | `Workflows/ConcurrentEnrichmentWorkflow.cs` → `throw new NotImplementedException` | §3.3 | **P2** |
 | G4 | **Sequential editorial workflow not implemented.** | `Workflows/SequentialEditorialWorkflow.cs` → `throw new NotImplementedException` | §3.4 | **P3** |
 | G5 | **UI does not stream live progress, still catches the scaffold exception, and has no category/tag filtering.** | `Components/Pages/Digest.razor` (`catch (NotImplementedException)`) | §1.3 (filter), §1.5/§2.4 (live progress) | **P4** |

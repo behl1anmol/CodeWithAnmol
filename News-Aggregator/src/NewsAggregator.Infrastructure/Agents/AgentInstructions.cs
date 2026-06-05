@@ -1,22 +1,33 @@
+using NewsAggregator.Core.Application.Enrichment;
 using NewsAggregator.Core.Domain;
 
 namespace NewsAggregator.Infrastructure.Agents;
 
 /// <summary>
-/// Placeholder system instructions per agent role. Kept here (not in Core) since
-/// prompts are an Infrastructure detail. TODO(scaffold): refine prompts and add
-/// structured-output / response-format constraints for Categorizer and Ranker.
+/// System instructions per agent role. Kept here (not in Core) since prompts are an
+/// Infrastructure detail. The Summarizer/Categorizer/Ranker prompts emit exactly the
+/// contract that <see cref="EnrichedItemAssembler"/> parses (P1); the Editor prompt is
+/// refined in P3.
 /// </summary>
 internal static class AgentInstructions
 {
+    // Single source of truth: the categorizer must pick from the Core taxonomy.
+    private static readonly string TaxonomyList = string.Join(", ", Taxonomy.Categories);
+
     public static string For(AgentRole role) => role switch
     {
         AgentRole.Summarizer =>
-            "Summarize the article in 2-3 neutral sentences. No opinions.",
+            "Summarize the article in 2-3 neutral, factual sentences. Reply with the "
+            + "summary text only — no opinions, headings, lists, or markdown.",
         AgentRole.Categorizer =>
-            "Assign exactly one category and up to five tags from the tech taxonomy.",
+            "Classify the article. Choose exactly one category from this taxonomy: "
+            + $"{TaxonomyList}. Also provide up to five short topic tags. Reply with strict "
+            + "minified JSON only — no prose, no code fences — in exactly this shape: "
+            + "{\"category\":\"<one taxonomy value>\",\"tags\":[\"tag1\",\"tag2\"]}.",
         AgentRole.Ranker =>
-            "Rate the article's tech significance from 0 to 1 with a one-line reason.",
+            "Rate the article's technical significance from 0.0 (trivial) to 1.0 "
+            + "(landmark). Reply with strict minified JSON only — no prose, no code fences "
+            + "— in exactly this shape: {\"score\":0.0,\"reason\":\"<one short line>\"}.",
         AgentRole.Editor =>
             "Order the items and write a short intro for each category section.",
         _ => "You are a helpful assistant.",
