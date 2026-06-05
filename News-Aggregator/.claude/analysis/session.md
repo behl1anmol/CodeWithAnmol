@@ -181,6 +181,47 @@ test double (headers immediate, body blocks until the read token cancels) + `Tim
 
 ---
 
+## Request 9 — Current-state analysis + MVP-completion prompt plan (no code build)
+
+**Branch:** `claude/news-aggregator-analysis-MrbTS` (off `main`). **Date:** 2026-06-05.
+Task: analyse how far the implementation is vs the MVP in `docs/`, decompose the remaining work
+into independently-buildable numbered prompts, and persist them so future sessions can build by
+prompt number. No application code changed this session — documentation only.
+
+### Deliverables
+- **New** `.claude/analysis/current-state-analysis.md` — verified DONE/NOT-DONE inventory (read from
+  source, not assumed), the gap-to-DoD table (G1–G8) mapped to prompts, sequencing DAG rationale,
+  deviation register, and the post-MVP exclusions.
+- **New** `.claude/prompts/mvp-completion-prompts.md` — six self-contained prompts (P1–P6) with
+  goal / prerequisites / file scope / steps / constraints / Definition-of-Done each, a dependency
+  graph, global rules, and verification commands.
+
+### Decisions (asked user; constraint C — no assumptions)
+1. **Plan scope** → **MVP Definition-of-Done only** (docs §7.5). Post-MVP roadmap excluded, listed
+   for reference only.
+2. **`GitHubNewsSource`** (a 3rd source, not in MVP docs §1.2/§1.5 which name only HN+RSS) →
+   **keep it, document the deviation.** The remaining pipeline is source-count-agnostic (consumes
+   the deduped `NewsItem[]`, groups by LLM category, not by source), so no prompt special-cases it.
+3. **Prompt independence** → **sequential DAG, green at every step**; each prompt self-contained
+   with explicit prerequisites; full suite must stay green to avoid an enhancement/bug-fix loop
+   (constraint F).
+
+### Gap found (the only NOT-DONE work to reach MVP DoD)
+G1 agent-output→`EnrichedItem` mapper (missing) · G2 placeholder agent prompts · G3
+`ConcurrentEnrichmentWorkflow` = `NotImplementedException` · G4 `SequentialEditorialWorkflow` =
+`NotImplementedException` · G5 UI: no live progress, scaffold `catch (NotImplementedException)`, no
+category/tag filtering · G6 no model-provider health check · G7 AppHost never pulls the Ollama
+model (single `dotnet run` can't produce a digest) · G8 no workflow smoke test. Everything else
+(5 projects, Core, 3 source adapters, providers, DI, composition root, AppHost wiring) is **done**;
+last recorded run **119 passed, 0 failed**.
+
+### Prompt map
+P1 enrichment contract + Core mapper → P2 concurrent workflow & P3 sequential workflow → P4 Blazor
+(progress + real refresh + filtering) & P6 AppHost model bootstrap + e2e smoke test; P5 provider
+health check is independent.
+
+---
+
 ## Notes / gotchas for future sessions
 - **SDK pin**: build/test from `/tmp` (or any dir without a parent `global.json`) until SDK 10.0.300 is installed. Do NOT build AppHost that way (needs `Aspire.AppHost.Sdk` msbuild-sdk from global.json).
 - **Core is BCL-only** — adding any package breaks `DependencyRuleTests` by design.
