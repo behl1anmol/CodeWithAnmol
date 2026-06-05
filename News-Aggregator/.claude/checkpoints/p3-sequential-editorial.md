@@ -1,7 +1,8 @@
 # Checkpoint — P3: Sequential editorial workflow
 
 **Prompt:** P3 (`../prompts/mvp-completion-prompts.md`) · **Prereq:** P1 ✅ (independent of P2) ·
-**Result:** 164 passed, 0 failed; Infrastructure + Web build 0 warn / 0 err.
+**Result:** 183 passed, 0 failed (164 at P3 + 19 from the PR #10 review fixes);
+Infrastructure + Web build 0 warn / 0 err.
 **Branch:** `feat/p3-sequential-editorial-workflow`.
 
 ## What it does
@@ -54,6 +55,21 @@ the Editor writes; all structure is a pure, unit-tested function of the input.
   — keeps the lean MVP dependency set; BCL `TimeProvider` is abstract with `GetUtcNow()` overridable.
 - `DependencyRuleTests` still green: `DigestComposer` + `EditorIntroParser` are BCL-only
   (`System.Text.Json` + `Core.Domain`).
+
+## PR #10 review fixes (post-review hardening)
+Three threads resolved on the PR, no happy-path behaviour change:
+- **🟡 `DigestComposer` comparer** — `GroupBy(Category, …)` `Ordinal` → **`OrdinalIgnoreCase`**, so
+  the composer / `EditorIntroParser` map / workflow lookup all agree. Categories are already
+  canonical (`Taxonomy.Normalize`), so this is defense-in-depth against a hypothetical `"AI"`/`"ai"`
+  split losing its intro; `group.Key` keeps the first (canonical) casing.
+- **🟡 `EditorIntroParser` had no direct tests** → new `Tests/Application/EditorIntroParserTests.cs`
+  (**19 tests**) pinning the balanced-brace scanner directly: fence/prose, brace-inside-string,
+  escaped quote, non-object root → empty, non-string values skipped, duplicate-key-last-wins,
+  case-insensitive lookup, null/blank/garbage/malformed → empty, blank-drop, trimming.
+- **🔵 `SequentialEditorialWorkflow` progress nit** — hoisted one constant `AgentProgress` + report
+  only on non-empty streamed text (skip empty/terminal deltas).
+
+Result after fixes: **183 passed, 0 failed.**
 
 ## Next
 Unblocked: **P4** (Blazor: live progress + real refresh + category/tag filter — needs P2+P3 ✅),

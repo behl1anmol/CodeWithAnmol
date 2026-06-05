@@ -41,8 +41,8 @@ API details that prevent the runtime bug/fix loops the architecture is designed 
   - `P1` enrichment contract+assembler · `P2` concurrent enrichment · `P3` sequential
     editorial · `P4` Blazor UI · `P5` provider health check · `P6` AppHost model bootstrap
     + end-to-end smoke test.
-  - **Status:** P1–P3 ✅ done (suite at 164 passed); **P4, P5, P6 remain.** Per-prompt state
-    snapshots live in `.claude/checkpoints/`.
+  - **Status:** P1–P3 ✅ done (suite at 183 passed, incl. PR #10 review fixes); **P4, P5, P6
+    remain.** Per-prompt state snapshots live in `.claude/checkpoints/`.
 - **Prior context:** `.claude/analysis/` (state analysis) and `.claude/plans/` (per-prompt
   plans + the baseline test count). Read the relevant one before starting a prompt.
 
@@ -70,7 +70,8 @@ dotnet test  NewsAggregator.Tests/NewsAggregator.Tests.csproj                   
 - **Definition of Done for every change:** compiles with **0 warnings / 0 errors** AND the
   **entire** test suite passes. Never leave the tree red.
 - The test count must be **monotonically non-decreasing** — add tests, break none. (Recent
-  high-water mark: 164 passed after P3; 119 was the original P1-era baseline.)
+  high-water mark: 183 passed after the P3 / PR #10 review fixes; 119 was the original P1-era
+  baseline.)
 - **AppHost is special:** `dotnet build NewsAggregator.AppHost/...` needs the **real SDK on
   PATH** (it consumes the `Aspire.AppHost.Sdk` msbuild SDK from `global.json`). Do **not**
   build it from a neutral cwd.

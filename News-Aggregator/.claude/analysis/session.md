@@ -305,8 +305,42 @@ Documentation request: capture the P2/P3 work into `.claude/` so future sessions
 
 ---
 
+## Request 15 — Resolve PR #10 review comments (P3 follow-up)
+
+**Branch:** `feat/p3-sequential-editorial-workflow` (committed directly onto the PR head, per
+explicit user decision, so PR #10 updates in place). **Date:** 2026-06-05. Three review
+threads resolved — two 🟡 substantive, one 🔵 nit — then `.claude` updated.
+
+### Comments & fixes
+1. **🟡 `EditorIntroParser.cs:66` — scanner untested.** Added
+   `Tests/Application/EditorIntroParserTests.cs` (**19 tests**) pinning the balanced-brace
+   scanner + per-entry filtering directly (was only reached via the workflow happy path + one
+   garbage case). Covers the reviewer's full list: fenced/prose-wrapped object, **brace inside
+   a string value**, escaped quote, non-object root (array/number/string/bool → empty),
+   non-string values skipped (string siblings kept), **duplicate-key-last-wins**, case-
+   insensitive lookup, null/blank/garbage/malformed → empty, blank key/value dropped, trimming.
+2. **🟡 `DigestComposer.cs:34` — comparer mismatch.** User chose *align the comparer*:
+   `GroupBy(Category, StringComparer.Ordinal)` → `OrdinalIgnoreCase`, so the composer, the
+   `EditorIntroParser` map, and the workflow lookup all agree. No behavioural change today
+   (categories arrive canonical from `Taxonomy.Normalize`); prevents a hypothetical `"AI"`/
+   `"ai"` split from producing a section the intro map could never key. `group.Key` keeps the
+   first item's (canonical) casing. Stays BCL-only → `DependencyRuleTests` green.
+3. **🔵 `SequentialEditorialWorkflow.cs:109` — per-event alloc.** Hoisted one constant
+   `AgentProgress` before the stream loop and gated `progress?.Report` on non-empty streamed
+   text (skip empty/terminal deltas) — one allocation, progress tracks real content. Existing
+   `Reports_composing_progress_for_the_editor` still green (canned `{"AI":"x"}` streams
+   non-empty).
+
+### Verification
+dotnet **was not installed** in this container (skill's "already installed" note is stale for
+this environment) → installed SDK 10.0.300 via `dotnet-install.sh` to `$HOME/.dotnet`. Infra
+build 0/0, Web build 0/0, **183 passed, 0 failed** (164 prior + 19 new). Pushed to the PR
+branch; resolved the three GitHub review threads with a reply each.
+
+---
+
 ## Notes / gotchas for future sessions
-- **SDK pin**: build/test from `/tmp` (or any dir without a parent `global.json`) until SDK 10.0.300 is installed. Do NOT build AppHost that way (needs `Aspire.AppHost.Sdk` msbuild-sdk from global.json).
+- **SDK pin / install**: `src/global.json` pins `10.0.300` (`rollForward: latestFeature`). Fresh web containers may ship **no** `dotnet` at all — install it with `curl -fsSL https://dot.net/v1/dotnet-install.sh | bash -s -- --version 10.0.300 --install-dir $HOME/.dotnet` then `export PATH=$HOME/.dotnet:$PATH`. (If only an older GA SDK is present, building from `/tmp` — a dir without a parent `global.json` — also works.) Do NOT build AppHost that way (needs `Aspire.AppHost.Sdk` msbuild-sdk from global.json).
 - **Versions**: authoritative = `src/Directory.Packages.props` + `src/global.json` (Agent Framework `1.9.0`, M.E.AI `10.6.0`, Aspire hosting `13.4.2`, ServiceDiscovery `10.6.0`, `OllamaSharp` `5.4.25`, `OpenAI` `2.10.0`), **not** the `docs/` chapters' original targets.
 - **Core is BCL-only** — adding any package breaks `DependencyRuleTests` by design.
 - Cannot change service ctor signatures without editing the Web composition root (out of allowed scope).

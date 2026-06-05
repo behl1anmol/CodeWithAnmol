@@ -227,3 +227,28 @@ the in-scope-frozen P1 assembler.
 
 ### Test result
 **164 passed, 0 failed.** Infra + Web build 0 warn / 0 err.
+
+---
+
+# P3 — PR #10 review fixes (post-review hardening)
+
+Three review threads on PR #10 (`feat/p3-sequential-editorial-workflow`) resolved. No
+behavioural change to the happy path; two robustness fixes + a streaming-progress nit, plus
+the direct parser tests the reviewer asked for.
+
+| File | Change | Comment |
+|------|--------|---------|
+| `Core/Application/Editorial/DigestComposer.cs` | `GroupBy(Category, StringComparer.Ordinal)` → `OrdinalIgnoreCase` | 🟡 align all three category comparers (composer / `EditorIntroParser` map / workflow lookup). Categories arrive canonical via `Taxonomy.Normalize`, so no behavioural change today — defense-in-depth against a hypothetical `"AI"`/`"ai"` split losing its intro |
+| `Infrastructure/Workflows/SequentialEditorialWorkflow.cs` | hoist one `AgentProgress` (constant payload, one alloc) + report only on non-empty streamed text (skip empty/terminal deltas) | 🔵 nit — progress now tracks actual streamed content; existing `Reports_composing_progress_for_the_editor` still green |
+| `Tests/Application/EditorIntroParserTests.cs` | **new** — 19 tests pinning the balanced-brace scanner + per-entry filtering directly | 🟡 the scanner (string mode / escape / fence-prose tolerance) had no direct tests |
+
+`EditorIntroParserTests` covers exactly the reviewer's list (and confirmed empirically by the
+passing run): `` ```json `` fence, prose-wrapped, **brace inside a string value**, escaped
+quote, non-object root (array/number/string/bool → empty), non-string property values skipped
+with string siblings kept, **duplicate-key-last-wins** (confirms `JsonDocument` default allows
+duplicate property names), case-insensitive lookup, null/blank input, garbage, malformed JSON
+inside braces, blank key/value dropped, key+value trimmed.
+
+### Test result
+**183 passed, 0 failed** (164 prior + 19 new). Infra + Web build 0 warn / 0 err.
+`DependencyRuleTests` green (`DigestComposer` change is BCL-only).
