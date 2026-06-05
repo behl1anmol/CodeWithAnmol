@@ -119,6 +119,58 @@ Build/test from `/tmp` (SDK pin). Infrastructure build 0 warnings / 0 errors. **
 
 ---
 
+## Request 7 — Implement RssNewsSource (Infrastructure)
+
+Scope: `src/NewsAggregator.Infrastructure/Sources/RssNewsSource.cs` (replace the
+`NotImplementedException` scaffold) + minimal Core config + appsettings + one new test file.
+No other source, no new abstractions, no architecture change. Cross-feed dedup stays in
+`NewsAggregationService`. Branch `claude/rss-news-source-1IT8K`. Plan:
+`.claude/plans/04-rss-source.md`.
+
+### Exploration
+- Scaffold already DI-wired: named client `"rss"` with **no** base address (feeds are
+  absolute URLs), ctor `(IHttpClientFactory, IOptions<SourceOptions>, ILogger)`, singleton
+  `INewsSource`. `System.ServiceModel.Syndication` (10.0.8) already referenced.
+- `RssOptions` had only `Enabled` + `Feeds`. `FakeHttpMessageHandler` already exists →
+  reused as-is. appsettings already has a `Sources:Rss` section with two real feeds.
+
+### Decisions (asked user; both recommended chosen)
+1. **Config** → extend `RssOptions` with `MaxItemsPerFeed` (20), `TimeoutSeconds` (30),
+   `MaxConcurrency` (4); mirrored in appsettings. BCL-only → `DependencyRuleTests` green.
+2. **Verification** → install SDK (no `dotnet` in this container — different machine than
+   prior sessions). Installed 10.0.300 to `/tmp/dotnet` via `dotnet-install.sh`.
+
+### Implemented
+- `FetchAsync` async iterator: `Enabled` gate → validate feed URLs (skip non-absolute) →
+  per-feed fan-out bounded by `SemaphoreSlim(MaxConcurrency)` → each feed gets a linked
+  timeout CTS (`CreateLinkedTokenSource` + `CancelAfter(TimeoutSeconds)`) → `GetAsync`
+  (`ResponseHeadersRead`) → `EnsureSuccessStatusCode` → `SyndicationFeed.Load(XmlReader)`
+  (RSS 2.0 + Atom) → `Items.Take(MaxItemsPerFeed)` → map → `Task.WhenAll` (order-preserving
+  → deterministic) → yield. Helpers: `ResolveFeedUrls`, `FetchFeedAsync`, `ParseFeed`,
+  `MapToNewsItem`, `ResolveLink`, `ResolveContent`, `ResolvePublishedAt`.
+- **Concurrency**: `SemaphoreSlim` + `Task.WhenAll` at feed granularity (bounded + ordered).
+- **Error isolation**: per-feed `try/catch`; HTTP error / `XmlException` / per-feed timeout
+  → `LogWarning` + empty list (that feed only). Invalid entries (blank title / no absolute
+  link) → `LogDebug` + skip. Caller cancellation (`when outerToken.IsCancellationRequested`)
+  → rethrow (fail-fast). Nothing swallowed.
+- **Mapping**: `Id`=`<guid>`/Atom id else absolute link; `Title`=title; `Url`=first absolute
+  link (skip entry if none — safest fallback vs fabricating a URL that would corrupt Core's
+  URL dedup); `Source`="RSS"; `Content`=`Summary` else `Content` text (raw, null if blank);
+  `PublishedAt`=`PublishDate` else `LastUpdatedTime` else null.
+
+### Tests (new `Sources/RssNewsSourceTests.cs`, 14 cases; existing untouched)
+valid mapping, guid→link id fallback, skip no-title, skip non-absolute link, empty feed,
+malformed feed isolated, multiple feeds merged in order, MaxItemsPerFeed, disabled=no
+items+zero HTTP, timed-out feed isolated (responder throws `TaskCanceledException`),
+caller cancellation throws, partial failure (500) isolated, invalid config URL skipped,
+Atom parsed. All offline via `FakeHttpMessageHandler`, deterministic.
+
+### Verification
+Installed SDK 10.0.300 → `dotnet build` Infrastructure 0/0; `dotnet test` **102 passed,
+0 failed** (88 prior + 14 new). Zero live network calls.
+
+---
+
 ## Notes / gotchas for future sessions
 - **SDK pin**: build/test from `/tmp` (or any dir without a parent `global.json`) until SDK 10.0.300 is installed. Do NOT build AppHost that way (needs `Aspire.AppHost.Sdk` msbuild-sdk from global.json).
 - **Core is BCL-only** — adding any package breaks `DependencyRuleTests` by design.
