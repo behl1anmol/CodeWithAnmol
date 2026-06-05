@@ -1,4 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Options;
 using NewsAggregator.Core.Application.Ports;
 using NewsAggregator.Core.Configuration;
@@ -69,6 +70,9 @@ public static class InfrastructureServiceCollectionExtensions
 
     private static void AddAgentsAndWorkflows(this IServiceCollection services)
     {
+        // The editorial workflow stamps Digest.GeneratedAt from an injected clock so the
+        // timestamp is deterministic in tests; production uses the system clock.
+        services.TryAddSingleton(TimeProvider.System);
         services.AddSingleton<IAgentFactory, AgentFrameworkAgentFactory>();
         services.AddScoped<IEnrichmentWorkflow, ConcurrentEnrichmentWorkflow>();
         services.AddScoped<IEditorialWorkflow, SequentialEditorialWorkflow>();
