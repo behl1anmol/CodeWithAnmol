@@ -3,11 +3,18 @@
 [← Model Providers & BYOK](04-model-providers-and-byok.md) · [Index](README.md) · [Next: Aspire Topology & Docker →](06-aspire-topology-and-docker.md)
 
 > **Pinned versions are in [§5.0](#50-microsoft-libraries-that-must-be-version-pinned)**
-> (and summarized in the [index](README.md)). Agent Framework packages are all `1.8.0`;
+> (and summarized in the [index](README.md)). Agent Framework packages are all `1.9.0`;
 > `Microsoft.Extensions.AI` packages are `10.6.0` — two independent version lines. The
 > per-project tables below name packages; §5.0 is the source of truth for versions.
 
 ## 5.0 Microsoft libraries that MUST be version-pinned
+
+> **Authoritative source.** The exact versions live in `src/Directory.Packages.props`
+> (Central Package Management) and `src/global.json` (the `Aspire.AppHost.Sdk` msbuild
+> SDK) — those files win if this table ever drifts from them. The values below were
+> reconciled with the repo on 2026-06-05; the design originally pinned older values
+> (Agent Framework `1.8.0`, Aspire `13.4.0`) which the code advanced to the nearest
+> current stable.
 
 Pin these **exact** versions, managed centrally via `Directory.Packages.props`
 (Central Package Management) so they can't drift between projects. Note the **two
@@ -15,12 +22,12 @@ independent version lines**: Agent Framework is on its own `1.x` line while
 `Microsoft.Extensions.AI` follows the `10.x` (.NET 10) line — they are *not* meant to
 match each other.
 
-**Group 1 — Microsoft Agent Framework — all on `1.8.0`:**
+**Group 1 — Microsoft Agent Framework — all on `1.9.0`:**
 | Package | Version |
 | --- | --- |
-| `Microsoft.Agents.AI` | `1.8.0` |
-| `Microsoft.Agents.AI.Workflows` | `1.8.0` |
-| `Microsoft.Agents.AI.OpenAI` | `1.8.0` |
+| `Microsoft.Agents.AI` | `1.9.0` |
+| `Microsoft.Agents.AI.Workflows` | `1.9.0` |
+| `Microsoft.Agents.AI.OpenAI` | `1.9.0` |
 
 **Group 2 — Microsoft.Extensions.AI — all on `10.6.0`:**
 | Package | Version |
@@ -29,19 +36,24 @@ match each other.
 | `Microsoft.Extensions.AI.Abstractions` | `10.6.0` *(usually transitive; pin if referenced directly)* |
 | `Microsoft.Extensions.AI.OpenAI` | `10.6.0` — ships `OpenAIClientExtensions.AsIChatClient()`; **required** for Route A of the OpenRouter/OpenAI adapter |
 
-**Group 3 — .NET Aspire — all on `13.4.0`:**
+**Group 3 — .NET Aspire hosting — on `13.4.2`:**
 | Package | Version |
 | --- | --- |
-| `Aspire.Hosting.AppHost` | `13.4.0` |
-| `Aspire.AppHost.Sdk` | `13.4.0` |
-| `Microsoft.Extensions.ServiceDiscovery` | `13.4.0` |
-| `Aspire.Hosting.Redis` *(optional)* | `13.4.0` |
-| `Aspire.StackExchange.Redis.DistributedCaching` *(optional)* | `13.4.0` |
+| `Aspire.Hosting.AppHost` | `13.4.2` |
+| `Aspire.AppHost.Sdk` (msbuild SDK in `global.json`) | `13.4.2` |
+| `Aspire.Hosting.Redis` *(optional, not referenced — Redis deferred)* | align to the Aspire line (`13.4.x`) when added |
+| `Aspire.StackExchange.Redis.DistributedCaching` *(optional, not referenced)* | align to the Aspire line (`13.4.x`) when added |
 
-**Local-LLM client (third-party, but Microsoft-recommended):**
+> **Note — `Microsoft.Extensions.ServiceDiscovery` is *not* on the Aspire line.** Although
+> the original design grouped it with Aspire at `13.4.0`, on nuget.org it tracks the
+> **.NET 10** line, so the repo pins it at **`10.6.0`** alongside the other
+> `Microsoft.Extensions.*` hosting packages (see §5.1 → Web).
+
+**Provider clients (third-party):**
 | Package | Version |
 | --- | --- |
-| `OllamaSharp` | v4+ ⚠️ pin — provides `OllamaApiClient` as `IChatClient` |
+| `OllamaSharp` | `5.4.25` — provides `OllamaApiClient` as `IChatClient`; Microsoft-recommended Ollama client |
+| `OpenAI` | `2.10.0` — official OpenAI SDK; OpenRouter via base-URL override |
 
 > **Deprecated / not used:** `Microsoft.Extensions.AI.Ollama` (**deprecated** — the
 > official .NET AI *Chat with a local AI model* quickstart uses `OllamaSharp` instead),
@@ -64,7 +76,7 @@ Legend: ✅ verified name · ⚠️ verify version/exact name · ❓ uncertain (
 | `Microsoft.Agents.AI.OpenAI` | ✅ / ⚠️ ver | `AsAIAgent()` bridge for OpenAI-compatible (OpenRouter). |
 | `Microsoft.Extensions.AI` | ✅ | `IChatClient`, `ChatClientBuilder`, `UseFunctionInvocation`, `UseOpenTelemetry`. |
 | `Microsoft.Extensions.AI.Abstractions` | ✅ | Abstractions (`ChatMessage`, `ChatResponse`); usually transitive via `Microsoft.Extensions.AI`. |
-| `OllamaSharp` (v4+) | ✅ | `OllamaApiClient` implementing `IChatClient` for local LLM. Microsoft-recommended Ollama client; `Microsoft.Extensions.AI.Ollama` is deprecated. No Community Toolkit needed. |
+| `OllamaSharp` (`5.4.25`) | ✅ | `OllamaApiClient` implementing `IChatClient` for local LLM. Microsoft-recommended Ollama client; `Microsoft.Extensions.AI.Ollama` is deprecated. No Community Toolkit needed. |
 | `Microsoft.Extensions.AI.OpenAI` | ✅ | `OpenAIClientExtensions.AsIChatClient()` — bridges `OpenAI.Chat.ChatClient` to `IChatClient` (Route A for OpenRouter). Pin at `10.6.0` with the other M.E.AI packages. |
 | `OpenAI` | ✅ | Official OpenAI SDK; OpenRouter via base-URL override (⚠️ verify option). |
 | `Microsoft.Extensions.Http` | ✅ | `IHttpClientFactory` for source connectors. |

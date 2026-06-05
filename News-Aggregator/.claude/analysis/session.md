@@ -222,8 +222,42 @@ health check is independent.
 
 ---
 
+## Request 10 — PR #7 review fix + docs version reconciliation
+
+**Branch:** `claude/news-aggregator-analysis-MrbTS`. **Date:** 2026-06-05. Documentation only.
+
+Codex review comment on PR #7 (`discussion_r3360542081`) flagged that the new prompt doc cited
+stale pinned versions. **Verified against source — the reviewer was correct.** Actual repo pins:
+
+| Package | Docs originally said | Repo actually pins (authoritative) |
+|---------|----------------------|------------------------------------|
+| `Microsoft.Agents.AI*` | `1.8.0` | **`1.9.0`** (`Directory.Packages.props`) |
+| `Aspire.Hosting.AppHost` | `13.4.0` | **`13.4.2`** (`Directory.Packages.props`) |
+| `Aspire.AppHost.Sdk` | `13.4.0` | **`13.4.2`** (`global.json`) |
+| `Microsoft.Extensions.ServiceDiscovery` | `13.4.0` (grouped w/ Aspire) | **`10.6.0`** (tracks .NET 10 line) |
+| `OllamaSharp` | `v4+` | **`5.4.25`** |
+| `OpenAI` | (unversioned) | **`2.10.0`** |
+| `Microsoft.Extensions.AI*` | `10.6.0` | `10.6.0` ✅ (unchanged) |
+
+### Fixes
+- **Commit `195235a`** — corrected `.claude/prompts/mvp-completion-prompts.md` (global rule 5, P2/P3
+  workflow notes, P6 AppHost note) and `.claude/analysis/current-state-analysis.md`; made
+  `Directory.Packages.props` + `global.json` the **authoritative** source (prompts now say to
+  re-read those before coding) so numbers can't go stale again. Replied to the thread + resolved it.
+- **This commit** — reconciled the `docs/` MVP chapters too (user asked): `docs/README` pinned-version
+  block, `docs/05 §5.0` version tables (+ an "authoritative source" note and the ServiceDiscovery
+  .NET-10-line callout), `docs/05 §5.1` OllamaSharp row, and the `v4+` mentions in `docs/04`/`docs/07`.
+  Historical "originally targeted 1.8.0/13.4.0" notes are left intentionally for traceability.
+
+### Gotcha recorded
+The `docs/` chapters are the *design intent*; `src/Directory.Packages.props` + `src/global.json` are
+the *source of truth* for versions. When they disagree, trust the repo files and reconcile the docs.
+
+---
+
 ## Notes / gotchas for future sessions
 - **SDK pin**: build/test from `/tmp` (or any dir without a parent `global.json`) until SDK 10.0.300 is installed. Do NOT build AppHost that way (needs `Aspire.AppHost.Sdk` msbuild-sdk from global.json).
+- **Versions**: authoritative = `src/Directory.Packages.props` + `src/global.json` (Agent Framework `1.9.0`, M.E.AI `10.6.0`, Aspire hosting `13.4.2`, ServiceDiscovery `10.6.0`, `OllamaSharp` `5.4.25`, `OpenAI` `2.10.0`), **not** the `docs/` chapters' original targets.
 - **Core is BCL-only** — adding any package breaks `DependencyRuleTests` by design.
 - Cannot change service ctor signatures without editing the Web composition root (out of allowed scope).
 - `ArgumentException.ThrowIfNullOrWhiteSpace(null)` throws `ArgumentNullException` (subclass) → use `Assert.ThrowsAny<ArgumentException>` in mixed null/blank theories.
