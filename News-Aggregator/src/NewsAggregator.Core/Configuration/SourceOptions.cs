@@ -26,4 +26,13 @@ public sealed class RssOptions
     public bool Enabled { get; set; } = true;
 
     public IList<string> Feeds { get; set; } = [];
+
+    /// <summary>Maximum items mapped from a single feed (most-recent first as the feed orders them).</summary>
+    public int MaxItemsPerFeed { get; set; } = 20;
+
+    /// <summary>Per-feed deadline covering the HTTP fetch and parse. Non-positive disables the timeout.</summary>
+    public int TimeoutSeconds { get; set; } = 30;
+
+    /// <summary>Upper bound on feeds fetched concurrently.</summary>
+    public int MaxConcurrency { get; set; } = 4;
 }

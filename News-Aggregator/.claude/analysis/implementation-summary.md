@@ -100,3 +100,48 @@ List endpoint error → `LogError`+rethrow (cancellation rethrown silently); per
 
 ### Test result
 **88 passed, 0 failed** (76 prior + 12 new). No live HN API calls — all HTTP via `FakeHttpMessageHandler`.
+
+---
+
+# Infrastructure — RssNewsSource (same branch lineage, branch `claude/rss-news-source-1IT8K`)
+
+Implemented `src/NewsAggregator.Infrastructure/Sources/RssNewsSource.cs` (was a
+`NotImplementedException` scaffold). Plan: `.claude/plans/04-rss-source.md`. Generic,
+config-driven RSS/Atom adapter. Cross-feed dedup stays in `NewsAggregationService`.
+
+| File | Change |
+|------|--------|
+| `src/NewsAggregator.Core/Configuration/SourceOptions.cs` | `RssOptions` += `MaxItemsPerFeed` (20), `TimeoutSeconds` (30), `MaxConcurrency` (4) |
+| `src/NewsAggregator.Web/appsettings.json` | surface the 3 new `Sources:Rss` knobs |
+| `src/NewsAggregator.Infrastructure/Sources/RssNewsSource.cs` | implemented `FetchAsync` + helpers |
+| `src/NewsAggregator.Tests/Sources/RssNewsSourceTests.cs` | new — 14 tests (`FakeHttpMessageHandler` reused, not modified) |
+
+### Algorithm
+`Enabled` gate → parse+validate feed URLs (skip non-absolute) → per-feed fan-out bounded by
+`SemaphoreSlim(MaxConcurrency)` → each feed: linked-timeout CTS → `GetAsync` →
+`EnsureSuccessStatusCode` → `SyndicationFeed.Load(XmlReader)` (RSS 2.0 + Atom) →
+`Items.Take(MaxItemsPerFeed)` → map → `Task.WhenAll` (order-preserving → deterministic) →
+yield. No cross-feed dedup.
+
+### Decisions (asked user)
+1. Config → **extend `RssOptions`** (MaxItemsPerFeed/TimeoutSeconds/MaxConcurrency); not hardcoded.
+2. Verification → **install SDK 10.0.300** (`/tmp/dotnet`) and run the suite.
+
+### Concurrency rationale
+`SemaphoreSlim` + `Task.WhenAll` at *feed* granularity — bounded concurrency **and**
+order-preserving deterministic merge. No sequential download.
+
+### Error handling
+Per-feed `try/catch` + own linked-timeout CTS. HTTP error / `XmlException` / per-feed
+timeout → `LogWarning` + empty result for that feed only (isolated). Invalid entries (blank
+title / no absolute link) → `LogDebug` + skip. Caller cancellation
+(`when (outerToken.IsCancellationRequested)`) → rethrow (fail-fast). Nothing swallowed.
+
+### Mapping (NewsItem unchanged)
+`Id`=`<guid>`/Atom id else absolute link; `Title`=title (skip if blank); `Url`=first
+absolute link (skip if none — safest fallback vs fabricating a URL); `Source`=`"RSS"`;
+`Content`=`Summary` else `Content` text, raw, null if blank; `PublishedAt`=`PublishDate`
+else `LastUpdatedTime` else null.
+
+### Test result
+**102 passed, 0 failed** (88 prior + 14 new). No live feed calls — all HTTP via `FakeHttpMessageHandler`.
