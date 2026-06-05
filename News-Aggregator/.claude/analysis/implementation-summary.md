@@ -145,3 +145,85 @@ else `LastUpdatedTime` else null.
 
 ### Test result
 **102 passed, 0 failed** (88 prior + 14 new). No live feed calls — all HTTP via `FakeHttpMessageHandler`.
+
+---
+
+# Infrastructure — GitHubNewsSource (third source)
+
+Implemented `src/NewsAggregator.Infrastructure/Sources/GitHubNewsSource.cs`, a third `INewsSource`
+adapter beyond the docs' HN+RSS pair. Retained by user decision; documented as the only deviation
+from the spec. Config-driven; same bounded-fan-out pattern as the other sources (`SemaphoreSlim` +
+`Task.WhenAll`, order-preserving, error-isolated, fail-fast on caller cancel). Offline tests via
+`FakeHttpMessageHandler`.
+
+### Test result
+**119 passed, 0 failed** — pre-P1 baseline. The remaining pipeline is source-count-agnostic: it
+consumes the deduped `NewsItem[]` and groups by LLM category, not by source.
+
+---
+
+# P1 — Enrichment output contract & Core mapper
+
+Pure, framework-free contract turning the 3 enrichment agents' replies into a valid `EnrichedItem`.
+
+| File | Change |
+|------|--------|
+| `Core/Application/Enrichment/Taxonomy.cs` | new — closed category set (AI, Security, Cloud, Devtools, Web, Data, Hardware, Other) + total `Normalize` |
+| `Core/Application/Enrichment/EnrichmentOutputs.cs` | new — `CategoryResult` / `RelevanceResult` POCOs (System.Text.Json targets) |
+| `Core/Application/Enrichment/EnrichedItemAssembler.cs` | new — pure, **total** mapper: raw summary/categorizer-JSON/ranker-JSON → valid `EnrichedItem`, never throws |
+| `Infrastructure/Agents/AgentInstructions.cs` | Summarizer/Categorizer/Ranker prompts emit the exact contract (plain text / strict minified JSON; taxonomy from `Taxonomy.Categories`) |
+| `Tests/Application/EnrichedItemAssemblerTests.cs` | new |
+
+Assembler is total: tolerates markdown fences/prose (extracts first balanced `{…}`); blank summary →
+content-snippet then title fallback; category blank/unknown → "Other"; tags drop blank/dedupe/cap 5;
+score missing/NaN/out-of-range → `RelevanceScore.Zero`. BCL-only (System.Text.Json).
+
+### Test result
+**143 passed, 0 failed.**
+
+---
+
+# P2 — Concurrent enrichment workflow
+
+| File | Change |
+|------|--------|
+| `Infrastructure/Workflows/ConcurrentEnrichmentWorkflow.cs` | implemented `EnrichAsync` (replaced NotImplementedException) |
+| `Infrastructure/Agents/AgentFrameworkAgentFactory.cs` | cache one `AIAgent` per role (`ConcurrentDictionary<AgentRole, Lazy<AIAgent>>`) — leak fix (commit 37d71f9) |
+| `Tests/Fakes/FakeAgentFactory.cs` | new — canned reply per role, optional `clientFactory` hook, one-agent-per-role caching |
+| `Tests/Workflows/ConcurrentEnrichmentWorkflowTests.cs` | new — 7 tests |
+
+Per-article fan-out Summarizer∥Categorizer∥Ranker via `AgentWorkflowBuilder.BuildConcurrent`;
+`TurnToken(emitEvents:true)` + `WatchStreamAsync`, route updates by `AIAgent.Id`; merge via the
+pure P1 `EnrichedItemAssembler`; `AgentProgress{Stage="enriching"}`; cross-article parallelism
+bounded by `SemaphoreSlim(MaxDegreeOfParallelism)` + `Task.WhenAll` (input order preserved);
+cancellation rethrown. Commits 122e25a + 37d71f9 (PR #9).
+
+### Test result
+**150 passed, 0 failed.**
+
+---
+
+# P3 — Sequential editorial workflow
+
+| File | Change |
+|------|--------|
+| `Core/Application/Editorial/DigestComposer.cs` | new — pure: sort by `Relevance.Value` desc + stable `Item.Title` ordinal tie-break → `GroupBy(Category)` (first-appearance = section rank) → intro-less `DigestSection`s; total |
+| `Core/Application/Editorial/EditorIntroParser.cs` | new — pure, total: first balanced `{…}` → category→intro map (OrdinalIgnoreCase); never throws |
+| `Infrastructure/Workflows/SequentialEditorialWorkflow.cs` | implemented `ComposeAsync` (replaced NotImplementedException) |
+| `Infrastructure/Agents/AgentInstructions.cs` | Editor prompt → strict minified JSON object category→intro |
+| `Infrastructure/DependencyInjection/InfrastructureServiceCollectionExtensions.cs` | `TryAddSingleton(TimeProvider.System)` (additive) |
+| `Tests/Application/DigestComposerTests.cs` | new — 6 tests |
+| `Tests/Workflows/SequentialEditorialWorkflowTests.cs` | new — 8 tests |
+| `Tests/Fakes/FixedTimeProvider.cs` | new — local BCL `TimeProvider` fake |
+
+`ComposeAsync`: `DigestComposer` → if 0 sections return empty `Digest` (skip the LLM) → else Editor
+via `AgentWorkflowBuilder.BuildSequential([editor])` + `RunStreamingAsync` + `TurnToken(emitEvents:true)`
++ `WatchStreamAsync` (accumulate by `editor.Id`), `AgentProgress{Role=Editor,Stage="composing"}`,
+`ThrowIfCancellationRequested` → `EditorIntroParser.Parse` → map intros by category (`section with {Intro}`)
+→ `Digest{GeneratedAt=_clock.GetUtcNow(), Sections}`. **Clock = injected `TimeProvider`** (user decision;
+deterministic tests via `FixedTimeProvider`; BCL, no package). `DependencyRuleTests` still green (both
+new Core files BCL-only). Tradeoff: `EditorIntroParser` duplicates the brace-matcher rather than refactor
+the in-scope-frozen P1 assembler.
+
+### Test result
+**164 passed, 0 failed.** Infra + Web build 0 warn / 0 err.

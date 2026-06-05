@@ -255,9 +255,62 @@ the *source of truth* for versions. When they disagree, trust the repo files and
 
 ---
 
+## Request 11 — Implement ConcurrentEnrichmentWorkflow (P2)
+
+**Branch:** merged via PR #9, commit `122e25a`. Scope: `Infrastructure/Workflows/ConcurrentEnrichmentWorkflow.cs` (replace `NotImplementedException`) + new test fakes/tests.
+
+Per-article fan-out Summarizer∥Categorizer∥Ranker via `AgentWorkflowBuilder.BuildConcurrent([s,c,r])`; input `List<ChatMessage>`; `TurnToken(emitEvents:true)` drives the agents and surfaces `AgentResponseUpdateEvent`s; route updates to roles by `AIAgent.Id` (aggregator message order is not guaranteed → parse AFTER the run, not in the aggregator); merge via the pure P1 `EnrichedItemAssembler` (total — junk output still yields a valid item); `AgentProgress{Stage="enriching"}`; cross-article parallelism bounded by `SemaphoreSlim(MaxDegreeOfParallelism)` + `Task.WhenAll` (input order preserved); genuine caller cancellation rethrown via `ThrowIfCancellationRequested` (`WatchStreamAsync` ends silently on cancel).
+
+### Implemented
+- `Infrastructure/Workflows/ConcurrentEnrichmentWorkflow.cs`
+- `Tests/Fakes/FakeAgentFactory.cs` — canned reply per role, optional `clientFactory` hook, caches one agent per role.
+- `Tests/Workflows/ConcurrentEnrichmentWorkflowTests.cs` — 7 tests.
+
+### Verification
+**150 passed, 0 failed** (143 prior + 7 new).
+
+---
+
+## Request 12 — Fix per-refresh agent/client leak (P2 follow-up)
+
+**Commit:** `37d71f9`. `AgentFrameworkAgentFactory` was building an `IChatClient`-backed agent per role per article → retained provider/HTTP resources on every digest refresh. Fix: cache one `AIAgent` per role for the factory lifetime via `ConcurrentDictionary<AgentRole, Lazy<AIAgent>>` (agents are stateless across runs and safe to reuse concurrently). `FakeAgentFactory` mirrors the same caching so tests exercise the reuse path.
+
+---
+
+## Request 13 — Implement SequentialEditorialWorkflow (P3)
+
+**Branch:** `feat/p3-sequential-editorial-workflow`. **Date:** 2026-06-05. Scope per `.claude/prompts/mvp-completion-prompts.md` P3. Deterministic structure in pure Core; intros from the Editor agent.
+
+### Decisions (asked user)
+- **Constraint C — `Digest.GeneratedAt` clock:** inject `TimeProvider` (chosen) vs `DateTimeOffset.UtcNow`. Rationale: deterministic exact-timestamp tests via `FixedTimeProvider`; `TimeProvider` is BCL (no package); additive change.
+
+### Implemented
+- `Core/Application/Editorial/DigestComposer.cs` — pure: `OrderByDescending(Relevance.Value).ThenBy(Item.Title, Ordinal)` (stable) → `GroupBy(Category, Ordinal)` (first-appearance = section rank) → intro-less `DigestSection`s; empty→empty; total.
+- `Core/Application/Editorial/EditorIntroParser.cs` — pure, total: first balanced `{…}` → category→intro map (OrdinalIgnoreCase), string values only, drops blanks; own brace-matcher; never throws on fences/prose/garbage.
+- `Infrastructure/Workflows/SequentialEditorialWorkflow.cs` — DigestComposer → if 0 sections return empty `Digest` (skip LLM) → else Editor via `AgentWorkflowBuilder.BuildSequential([editor])` + `InProcessExecution.RunStreamingAsync` + `TurnToken(emitEvents:true)` + `WatchStreamAsync` (accumulate by `editor.Id`), `AgentProgress{Role=Editor,Stage="composing"}`, `ThrowIfCancellationRequested` → `EditorIntroParser.Parse` → map intros by category → `Digest{GeneratedAt=_clock.GetUtcNow(), Sections}`.
+- `Infrastructure/Agents/AgentInstructions.cs` — Editor prompt → strict minified JSON object category→intro (no prose/fences).
+- DI: `TryAddSingleton(TimeProvider.System)` in `InfrastructureServiceCollectionExtensions` (additive; no Web/Program.cs edit).
+- `Tests/Application/DigestComposerTests.cs` — 6 tests.
+- `Tests/Workflows/SequentialEditorialWorkflowTests.cs` — 8 tests.
+- `Tests/Fakes/FixedTimeProvider.cs` — local BCL `TimeProvider` fake (no external testing package).
+
+### Verification
+Infra 0/0, Web 0/0, **164 passed, 0 failed** (150 prior + 14 new). `BuildSequential` single-agent path runtime-verified by passing workflow tests. `DependencyRuleTests` still green (both new Core files BCL-only).
+
+---
+
+## Request 14 — Persist P2/P3 session data + checkpoints; branch/commit/PR
+
+Documentation request: capture the P2/P3 work into `.claude/` so future sessions resume cold, then branch + commit + push + open a PR. Added a new `.claude/checkpoints/` log (`README.md`, `p2-concurrent-enrichment.md`, `p3-sequential-editorial.md`), updated `.claude/analysis/current-state-analysis.md`, this `session.md`, `.claude/analysis/implementation-summary.md`, and bumped the test-count/status in `.claude/skills/news-aggregator-dev/SKILL.md`. (Note: the request initially said a `.copilot` folder by mistake; corrected to `.claude` — keep one knowledge base only.)
+
+---
+
 ## Notes / gotchas for future sessions
 - **SDK pin**: build/test from `/tmp` (or any dir without a parent `global.json`) until SDK 10.0.300 is installed. Do NOT build AppHost that way (needs `Aspire.AppHost.Sdk` msbuild-sdk from global.json).
 - **Versions**: authoritative = `src/Directory.Packages.props` + `src/global.json` (Agent Framework `1.9.0`, M.E.AI `10.6.0`, Aspire hosting `13.4.2`, ServiceDiscovery `10.6.0`, `OllamaSharp` `5.4.25`, `OpenAI` `2.10.0`), **not** the `docs/` chapters' original targets.
 - **Core is BCL-only** — adding any package breaks `DependencyRuleTests` by design.
 - Cannot change service ctor signatures without editing the Web composition root (out of allowed scope).
 - `ArgumentException.ThrowIfNullOrWhiteSpace(null)` throws `ArgumentNullException` (subclass) → use `Assert.ThrowsAny<ArgumentException>` in mixed null/blank theories.
+- **Agent Framework workflows (1.9.0):** send a `TurnToken(emitEvents:true)` or the run hangs `Idle`; route streamed `AgentResponseUpdateEvent`s by `AIAgent.Id` (aggregator order is not guaranteed); `WatchStreamAsync` ends WITHOUT throwing on cancel, so call `ThrowIfCancellationRequested()` after the loop. `BuildSequential([singleAgent])` works and streams identically to `BuildConcurrent`.
+- **Editorial determinism:** the sort/group lives in the pure Core `DigestComposer`; only section intros come from the Editor agent. `EditorIntroParser` is total like `EnrichedItemAssembler`. (It duplicates the brace-matcher rather than refactor the in-scope-frozen P1 assembler — candidate to hoist to one shared Core JSON helper.)
+- **Clock:** the editorial workflow takes an injected `TimeProvider` (registered `TryAddSingleton(TimeProvider.System)`); tests use the local `FixedTimeProvider` fake (no external testing package).
