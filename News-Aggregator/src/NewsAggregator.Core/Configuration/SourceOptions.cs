@@ -9,6 +9,8 @@ public sealed class SourceOptions
     public HackerNewsOptions HackerNews { get; set; } = new();
 
     public RssOptions Rss { get; set; } = new();
+
+    public GitHubOptions GitHub { get; set; } = new();
 }
 
 public sealed class HackerNewsOptions
@@ -34,5 +36,22 @@ public sealed class RssOptions
     public int TimeoutSeconds { get; set; } = 30;
 
     /// <summary>Upper bound on feeds fetched concurrently.</summary>
+    public int MaxConcurrency { get; set; } = 4;
+}
+
+public sealed class GitHubOptions
+{
+    public bool Enabled { get; set; } = true;
+
+    /// <summary>Repositories to pull releases from, each as "owner/repo" (e.g. "dotnet/runtime").</summary>
+    public IList<string> Repositories { get; set; } = [];
+
+    /// <summary>Maximum releases mapped from a single repository (most-recent first as GitHub orders them).</summary>
+    public int MaxReleasesPerRepo { get; set; } = 5;
+
+    /// <summary>Per-repository deadline covering the HTTP fetch and parse. Non-positive disables the timeout.</summary>
+    public int TimeoutSeconds { get; set; } = 30;
+
+    /// <summary>Upper bound on repositories fetched concurrently.</summary>
     public int MaxConcurrency { get; set; } = 4;
 }
