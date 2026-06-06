@@ -348,3 +348,50 @@ branch; resolved the three GitHub review threads with a reply each.
 - **Agent Framework workflows (1.9.0):** send a `TurnToken(emitEvents:true)` or the run hangs `Idle`; route streamed `AgentResponseUpdateEvent`s by `AIAgent.Id` (aggregator order is not guaranteed); `WatchStreamAsync` ends WITHOUT throwing on cancel, so call `ThrowIfCancellationRequested()` after the loop. `BuildSequential([singleAgent])` works and streams identically to `BuildConcurrent`.
 - **Editorial determinism:** the sort/group lives in the pure Core `DigestComposer`; only section intros come from the Editor agent. `EditorIntroParser` is total like `EnrichedItemAssembler`. (It duplicates the brace-matcher rather than refactor the in-scope-frozen P1 assembler — candidate to hoist to one shared Core JSON helper.)
 - **Clock:** the editorial workflow takes an injected `TimeProvider` (registered `TryAddSingleton(TimeProvider.System)`); tests use the local `FixedTimeProvider` fake (no external testing package).
+
+---
+
+## Session — P5: Model-provider health check & startup validation
+
+**Branch:** `feat/p5-model-provider-health-check` (off `main`). **Date:** 2026-06-06.
+Prompt P5 from `.claude/prompts/mvp-completion-prompts.md` (gap G6). Fully independent of P1–P4/P6.
+
+### User decisions (AskUserQuestion)
+1. **Registration:** in `Web/Program.cs`; Infrastructure takes only
+   `Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions` (canonical "library implements
+   `IHealthCheck`" pattern; smallest footprint).
+2. **Scope:** stay minimal — check + registration + tests. **No** AppHost `.WithHttpHealthCheck`
+   dashboard wiring (that drifts toward P6); no production exposure of `/health`.
+
+### Changes
+- **New** `Infrastructure/HealthChecks/ModelProviderHealthCheck.cs` (`IHealthCheck`). Branches on
+  `ModelOptions.Provider`: **Ollama** → `GET {endpoint}/api/tags`, `IsSuccessStatusCode` ⇒ Healthy
+  else Unhealthy; **OpenRouter** → `GET {base}` with **no** auth header, *any* response ⇒ Healthy
+  (reachability, not a completion). `HttpRequestException` / non-caller `TaskCanceledException`
+  (the bounded timeout) ⇒ Unhealthy; genuine caller cancel propagates. Key never on the request
+  nor in any description.
+- **`InfrastructureServiceCollectionExtensions`** — named client `model-provider-health` with a
+  5 s `Timeout` (caps total probe time even under ServiceDefaults' resilience handler).
+- **`Web/Program.cs`** — `AddHealthChecks().AddCheck<ModelProviderHealthCheck>("model-provider",
+  tags: ["ready"])`. Accumulates onto the ServiceDefaults builder; surfaced by the existing
+  `MapDefaultEndpoints()` `/health` (dev-only); tag `ready` keeps it off the `live`-only `/alive`.
+- **Packages** — added `Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions` **10.0.8**
+  (verified on nuget; same assembly the AspNetCore shared framework ships at 10.0.8 → unifies in
+  Web, **no warning**) to `Directory.Packages.props` + Infrastructure csproj.
+- **New** `Tests/HealthChecks/ModelProviderHealthCheckTests.cs` (9): Ollama 200/500/transport-throw/
+  timeout; OpenRouter 200 + 401-still-reachable + unreachable; key-never-surfaced (reachable +
+  unreachable). All via `FakeHttpMessageHandler` + NSubstitute `IHttpClientFactory`.
+
+### Verification
+SDK 10.0.300 (`$HOME/.dotnet`). Infra build **0/0**, Web build **0/0**, full suite
+**204 passed, 0 failed** (195 prior + 9 new). `docs/` left untouched — docs/05 §5.3 + docs/06 §74
+already describe the probe as a present-tense feature (now true; no operator-step change).
+
+### Notes / gotchas
+- **`IHealthCheck` is in the AspNetCore shared framework**, present in the Web SDK
+  (`Microsoft.NET.Sdk.Web`) but **not** in a plain `Microsoft.NET.Sdk` library → Infrastructure
+  needs the standalone `…HealthChecks.Abstractions` package to implement it.
+- **OpenRouter probe = reachability only**: status code is intentionally ignored (401/404 still
+  prove routability) so the check never needs the BYOK key and never requires a real completion.
+- The named health client's 5 s `HttpClient.Timeout` is what bounds the probe; `ConfigureHttpClientDefaults`
+  (resilience) still applies, but the client-level timeout caps total time → fast Unhealthy.

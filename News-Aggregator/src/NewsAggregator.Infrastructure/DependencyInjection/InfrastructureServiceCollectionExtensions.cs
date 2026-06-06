@@ -6,6 +6,7 @@ using NewsAggregator.Core.Configuration;
 using NewsAggregator.Core.Domain;
 using NewsAggregator.Infrastructure.Agents;
 using NewsAggregator.Infrastructure.Caching;
+using NewsAggregator.Infrastructure.HealthChecks;
 using NewsAggregator.Infrastructure.Models;
 using NewsAggregator.Infrastructure.Sources;
 using NewsAggregator.Infrastructure.Workflows;
@@ -66,6 +67,13 @@ public static class InfrastructureServiceCollectionExtensions
         });
 
         services.AddSingleton<IChatClientFactory, ChatClientFactory>();
+
+        // Bounded-timeout client for the provider reachability probe (ModelProviderHealthCheck).
+        // The short Timeout caps the total probe time even under ServiceDefaults' resilience
+        // handler, so a down provider yields a fast Unhealthy. The check itself is registered
+        // in the Web composition root (Program.cs).
+        services.AddHttpClient(ModelProviderHealthCheck.HttpClientName,
+            static client => client.Timeout = TimeSpan.FromSeconds(5));
     }
 
     private static void AddAgentsAndWorkflows(this IServiceCollection services)

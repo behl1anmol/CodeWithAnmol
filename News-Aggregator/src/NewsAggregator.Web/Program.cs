@@ -3,6 +3,7 @@ using NewsAggregator.Core.Application.Services;
 using NewsAggregator.Core.Configuration;
 using NewsAggregator.Core.Domain;
 using NewsAggregator.Infrastructure.DependencyInjection;
+using NewsAggregator.Infrastructure.HealthChecks;
 using NewsAggregator.Web.Components;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -37,6 +38,11 @@ builder.Services.AddScoped<IDigestApplicationService, DigestApplicationService>(
 
 // --- Infrastructure adapters bound to Core ports ---
 builder.Services.AddInfrastructure();
+
+// Probe the active model provider; surfaced on /health (and the Aspire dashboard) alongside
+// the ServiceDefaults "self" check. Tagged "ready" so it stays off the "live"-only /alive route.
+builder.Services.AddHealthChecks()
+    .AddCheck<ModelProviderHealthCheck>("model-provider", tags: ["ready"]);
 
 // --- Blazor Server UI ---
 builder.Services.AddRazorComponents()
