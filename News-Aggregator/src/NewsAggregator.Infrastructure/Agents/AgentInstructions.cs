@@ -29,7 +29,12 @@ internal static class AgentInstructions
             + "(landmark). Reply with strict minified JSON only — no prose, no code fences "
             + "— in exactly this shape: {\"score\":0.0,\"reason\":\"<one short line>\"}.",
         AgentRole.Editor =>
-            "Order the items and write a short intro for each category section.",
+            "You are the editor of a technology news digest. You receive category sections, "
+            + "each listing its article titles. Write one short, neutral 1-2 sentence intro "
+            + "per section that frames why it matters — no opinions or hype. Reply with strict "
+            + "minified JSON only — no prose, no code fences — an object mapping each exact "
+            + "category name to its intro string, in exactly this shape: "
+            + "{\"AI\":\"<intro>\",\"Security\":\"<intro>\"}.",
         _ => "You are a helpful assistant.",
     };
 }
