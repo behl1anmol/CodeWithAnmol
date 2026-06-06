@@ -41,8 +41,11 @@ API details that prevent the runtime bug/fix loops the architecture is designed 
   - `P1` enrichment contract+assembler · `P2` concurrent enrichment · `P3` sequential
     editorial · `P4` Blazor UI · `P5` provider health check · `P6` AppHost model bootstrap
     + end-to-end smoke test.
-  - **Status:** P1–P3 ✅ done (suite at 183 passed, incl. PR #10 review fixes); **P4, P5, P6
-    remain.** Per-prompt state snapshots live in `.claude/checkpoints/`.
+  - **Status: P1–P6 ✅ ALL DONE — MVP complete** (`docs/07 §7.5` satisfied). Suite at **209
+    passed, 0 failed**. P6 bootstraps the Ollama model via the **CommunityToolkit Ollama
+    hosting** integration (`AddOllama(...).WithDataVolume().AddModel("llama3.2")`; client stays
+    OllamaSharp) and adds the end-to-end `DigestPipelineSmokeTests`. Per-prompt state snapshots
+    live in `.claude/checkpoints/`.
 - **Prior context:** `.claude/analysis/` (state analysis) and `.claude/plans/` (per-prompt
   plans + the baseline test count). Read the relevant one before starting a prompt.
 

@@ -36,6 +36,14 @@
   <ItemGroup Label=".NET Aspire (13.x line)">
     <!-- docs pinned 13.4.0; 13.4.2 is the current latest stable. -->
     <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.4.2" />
+    <!--
+      P6: AppHost Ollama model bootstrap. CommunityToolkit Ollama HOSTING integration
+      (AddOllama(...).AddModel(...) auto-pulls the model on startup so a single `dotnet run`
+      can serve a digest). 13.4.0 is the current stable on the Aspire 13.4.x line. This
+      reverses the earlier "no Community Toolkit" stance for HOSTING only — the chat CLIENT
+      is still OllamaSharp inside Infrastructure (see docs/06 §6.1).
+    -->
+    <PackageVersion Include="CommunityToolkit.Aspire.Hosting.Ollama" Version="13.4.0" />
   </ItemGroup>
 
   <ItemGroup Label="Hosting / cross-cutting (10.x line)">
@@ -74,7 +82,9 @@
   <!--
     Deliberately NOT referenced (per docs / Lean MVP scope):
       - Microsoft.Extensions.AI.Ollama         (deprecated)
-      - CommunityToolkit.Aspire.* (Ollama)     (not needed; OllamaSharp is the client)
+      - CommunityToolkit.Aspire.OllamaSharp    (client integration; OllamaSharp is wired
+                                               directly in Infrastructure — only the Ollama
+                                               *hosting* toolkit is used, see above)
       - Aspire.Hosting.Redis / Aspire.StackExchange.Redis.DistributedCaching
                                                (Redis deferred — in-memory cache only)
   -->

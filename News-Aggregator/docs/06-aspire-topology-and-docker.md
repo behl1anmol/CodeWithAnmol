@@ -12,7 +12,7 @@ logic). It declares the resources, wires endpoints/connection strings, and provi
 graph TD
     subgraph AppHost["NewsAggregator.AppHost (Aspire app model)"]
         Web["webfrontend<br/>(Blazor Server)"]
-        Ollama["ollama<br/>(first-party generic container) ✅"]
+        Ollama["ollama + model<br/>(CommunityToolkit hosting, AddModel) ✅"]
         Redis["redis (optional)<br/>distributed cache ⚠️ver"]
     end
     Dash["Aspire Dashboard<br/>(traces / logs / metrics)"]
@@ -23,42 +23,46 @@ graph TD
     Ollama --> Dash
 ```
 
-### Illustrative AppHost wiring (first-party Aspire only)
+### AppHost wiring (CommunityToolkit Ollama hosting — verified against 13.4.0)
 ```csharp
-// Illustrative — verify Aspire API/version before use. No Community Toolkit.
 var builder = DistributedApplication.CreateBuilder(args);
 
-// Local LLM — Ollama modeled as a first-party generic container ✅
-var ollama = builder.AddContainer("ollama", "ollama/ollama")  // Aspire.Hosting.AppHost
-                    .WithHttpEndpoint(targetPort: 11434, name: "http")
-                    .WithVolume("ollama-models", "/root/.ollama"); // persist pulled models
-
-// Optional cache
-var redis = builder.AddRedis("redis");            // ⚠️ verify version
+// Local LLM via the CommunityToolkit Ollama HOSTING integration. AddModel pulls the model on
+// startup so a single `dotnet run` can serve a digest on the first run. Verified against
+// CommunityToolkit.Aspire.Hosting.Ollama 13.4.0.
+var ollama = builder.AddOllama("ollama")          // CommunityToolkit.Aspire.Hosting.Ollama
+                    .WithDataVolume();             // persist pulled models across runs
+var model  = ollama.AddModel("llama3.2");          // MUST match Models:Ollama:DefaultModel
 
 builder.AddProject<Projects.NewsAggregator_Web>("webfrontend")
-       // Inject the Ollama endpoint into the Web app's configuration.
-       .WithEnvironment("Models__Ollama__Endpoint",
-                        ollama.GetEndpoint("http"))   // ⚠️ verify endpoint accessor name
-       .WithReference(redis)
-       .WaitFor(ollama)
+       // Inject the Ollama server endpoint into the Web app's configuration. PrimaryEndpoint is
+       // the verified OllamaResource accessor; env-var name/shape is unchanged.
+       .WithEnvironment("Models__Ollama__Endpoint", ollama.Resource.PrimaryEndpoint)
+       // Wait for the MODEL resource (pull complete + healthy), not just the server.
+       .WaitFor(model)
        .WithExternalHttpEndpoints();
 
 builder.Build().Run();
 ```
 
-> **Verified facts (corrected):**
-> - The local-LLM **client** is `OllamaSharp` (`OllamaApiClient` as `IChatClient`) ✅,
->   the Microsoft-recommended Ollama client (`Microsoft.Extensions.AI.Ollama` is
->   deprecated) — **no Community Toolkit**. See [§4.3](04-model-providers-and-byok.md).
-> - Aspire has **no first-party Ollama *hosting* integration**, so the Ollama runtime
->   is modeled as a **generic container** with `AddContainer(...)` (part of
->   `Aspire.Hosting.AppHost`) ✅. A named volume persists pulled models across runs.
-> - The container's endpoint is passed to the Web app via configuration
->   (`Models__Ollama__Endpoint`); the provider adapter constructs the `OllamaSharp`
->   `OllamaApiClient` from it. ⚠️ Verify the exact endpoint-accessor API for your Aspire version.
-> - **Alternative:** run Ollama on the host (developers already do `ollama pull`) and
->   point `Models:Ollama:Endpoint` at it — no container at all.
+> **Verified facts (P6, against installed packages):**
+> - The local-LLM **client** is still `OllamaSharp` (`OllamaApiClient` as `IChatClient`) ✅
+>   inside Infrastructure (`Microsoft.Extensions.AI.Ollama` is deprecated;
+>   `CommunityToolkit.Aspire.OllamaSharp` is **not** used). See [§4.3](04-model-providers-and-byok.md).
+> - Aspire has no *first-party* Ollama hosting integration, so the AppHost uses the
+>   **CommunityToolkit Ollama hosting** package (`CommunityToolkit.Aspire.Hosting.Ollama`
+>   `13.4.0`) ✅. `AddOllama(name).WithDataVolume().AddModel(modelName)` are verified; the
+>   model is pulled on startup and the data volume persists it across runs. This reverses the
+>   earlier "no Community Toolkit (hosting)" stance — the *client* decision is unchanged.
+> - `AddModel("llama3.2")` must match `Models:Ollama:DefaultModel` in `Web/appsettings.json`.
+>   The AppHost is infra composition only, so this is a documented literal (commented in
+>   `AppHost.cs`), not shared config.
+> - The endpoint is passed to the Web app via `Models__Ollama__Endpoint` using the verified
+>   `OllamaResource.PrimaryEndpoint`; the provider adapter constructs the `OllamaSharp`
+>   `OllamaApiClient` from it (Infrastructure unchanged). `WaitFor(model)` blocks the Web app
+>   until the pull completes, so the first refresh has a model to serve.
+> - **Alternative:** run Ollama on the host (developers already do `ollama pull`) and point
+>   `Models:Ollama:Endpoint` at it.
 
 ### ServiceDefaults
 Per [§2](02-architecture-and-project-structure.md), the ServiceDefaults extension
