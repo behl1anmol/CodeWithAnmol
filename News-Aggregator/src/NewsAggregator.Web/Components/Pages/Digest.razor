@@ -1,6 +1,11 @@
 @page "/digest"
 @rendermode InteractiveServer
+@using Microsoft.Extensions.Logging
+@using NewsAggregator.Core.Application
+@using NewsAggregator.Core.Application.Editorial
+@using NewsAggregator.Core.Application.Enrichment
 @inject IDigestApplicationService DigestService
+@inject ILogger<NewsAggregator.Web.Components.Pages.Digest> Logger
 
 <PageTitle>Digest</PageTitle>
 
@@ -10,6 +15,15 @@
     @(_busy ? "Refreshing…" : "Refresh digest")
 </button>
 
+@if (_busy && _progress is not null)
+{
+    <p class="status">
+        @_progress.Stage@(_progress.TotalCount is int total && total > 0
+            ? $" {_progress.ProcessedCount ?? 0}/{total}"
+            : string.Empty)
+    </p>
+}
+
 @if (_status is not null)
 {
     <p class="status">@_status</p>
@@ -17,42 +31,99 @@
 
 @if (_digest is not null)
 {
-    @foreach (var section in _digest.Sections)
-    {
-        <section>
-            <h2>@section.Category</h2>
-            @if (!string.IsNullOrWhiteSpace(section.Intro))
-            {
-                <p>@section.Intro</p>
-            }
-            <ul>
-                @foreach (var item in section.Items)
+    <div class="filters">
+        <label>
+            Category:
+            <select @bind="_category">
+                <option value="">All categories</option>
+                @foreach (var category in Taxonomy.Categories)
                 {
-                    <li><a href="@item.Item.Url" target="_blank">@item.Item.Title</a></li>
+                    <option value="@category">@category</option>
                 }
-            </ul>
-        </section>
+            </select>
+        </label>
+        <label>
+            Tag:
+            <select @bind="_tag">
+                <option value="">All tags</option>
+                @foreach (var tag in DigestFilter.DistinctTags(_digest))
+                {
+                    <option value="@tag">@tag</option>
+                }
+            </select>
+        </label>
+    </div>
+
+    @if (View!.Sections.Count == 0)
+    {
+        <p>No items match the current filter.</p>
+    }
+    else
+    {
+        @foreach (var section in View.Sections)
+        {
+            <section>
+                <h2>@section.Category</h2>
+                @if (!string.IsNullOrWhiteSpace(section.Intro))
+                {
+                    <p>@section.Intro</p>
+                }
+                <ul>
+                    @foreach (var item in section.Items)
+                    {
+                        <li>
+                            <a href="@item.Item.Url" target="_blank">@item.Item.Title</a>
+                            <span class="score">@item.Relevance.Value.ToString("0.00", CultureInfo.InvariantCulture)</span>
+                            <p class="summary">@item.Summary</p>
+                            @if (item.Tags.Count > 0)
+                            {
+                                <p class="tags">@string.Join(", ", item.Tags)</p>
+                            }
+                        </li>
+                    }
+                </ul>
+            </section>
+        }
     }
 }
 
 @code {
     private bool _busy;
     private string? _status;
+    private AgentProgress? _progress;
+    private string? _category;
+    private string? _tag;
     private NewsAggregator.Core.Domain.Digest? _digest;
 
-    // The UI only invokes the application service and renders the result — no
-    // business logic lives here (docs §2.6).
+    // Filtered view, recomputed from the pure Core helper on each render so all filtering
+    // logic stays out of the component (docs §2.6). Null until the first refresh.
+    private NewsAggregator.Core.Domain.Digest? View =>
+        _digest is null ? null : DigestFilter.Apply(_digest, _category, _tag);
+
+    // The UI only invokes the application service and renders the result — all filtering
+    // lives in the pure Core DigestFilter; no business logic lives here (docs §2.6).
     private async Task RefreshAsync()
     {
         _busy = true;
         _status = null;
+        _progress = null;
+        _category = null;
+        _tag = null;
+
+        var progress = new Progress<AgentProgress>(p =>
+        {
+            _progress = p;
+            _ = InvokeAsync(StateHasChanged);
+        });
+
         try
         {
-            _digest = await DigestService.RefreshDigestAsync();
+            _digest = await DigestService.RefreshDigestAsync(progress);
         }
-        catch (NotImplementedException)
+        catch (Exception ex)
         {
-            _status = "Digest generation is not implemented yet (scaffold).";
+            _status = "Could not generate the digest. Check the model provider and try again.";
+            Logger.LogError(ex, "Digest refresh failed");
         }
         finally
         {

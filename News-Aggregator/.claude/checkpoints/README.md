@@ -7,6 +7,7 @@ changed, the verification result, and the unblocked next step — so any agent c
 |---|---|---|---|
 | Concurrent enrichment workflow | P2 | 150 passed, 0 failed | `p2-concurrent-enrichment.md` |
 | Sequential editorial workflow | P3 | 164 passed, 0 failed | `p3-sequential-editorial.md` |
+| Blazor UI: live progress, refresh, filter | P4 | 174 passed, 0 failed | `p4-blazor-ui.md` |
 
 Earlier work (Core business logic, the three source adapters, P1 enrichment contract) predates
 this checkpoints log — see `../analysis/session.md` and `../analysis/implementation-summary.md`.
