@@ -135,16 +135,17 @@ public sealed class DigestFilterTests
     }
 
     [Fact]
-    public void DistinctTags_dedupes_case_insensitively_and_orders()
+    public void DistinctTags_dedupes_and_orders_case_insensitively()
     {
         Digest digest = MakeDigest(
-            Item("a", "AI", 0.9, "llm", "agents"),
-            Item("s", "Security", 0.7, "LLM", "cve"));
+            Item("a", "AI", 0.9, "agents", "CVE"),
+            Item("s", "Security", 0.7, "cve", "llm"));
 
         IReadOnlyList<string> tags = DigestFilter.DistinctTags(digest);
 
-        // "llm"/"LLM" collapse to the first seen; result is ordinal-ordered.
-        Assert.Equal(["agents", "cve", "llm"], tags);
+        // "CVE"/"cve" collapse to the first seen ("CVE"); ordering is case-insensitive, so
+        // "agents" sorts before "CVE" (an Ordinal sort would wrongly put "CVE" first).
+        Assert.Equal(["agents", "CVE", "llm"], tags);
     }
 
     [Fact]
@@ -153,5 +154,26 @@ public sealed class DigestFilterTests
         Digest digest = new() { GeneratedAt = When };
 
         Assert.Empty(DigestFilter.DistinctTags(digest));
+    }
+
+    [Fact]
+    public void PresentCategories_lists_only_present_categories_in_taxonomy_order()
+    {
+        Digest digest = MakeDigest(
+            Item("c", "Cloud", 0.6),
+            Item("a", "AI", 0.9),
+            Item("s", "Security", 0.7));
+
+        // Taxonomy order is AI, Security, Cloud, … — the present subset keeps that order,
+        // not the score/section order, and omits absent categories.
+        Assert.Equal(["AI", "Security", "Cloud"], DigestFilter.PresentCategories(digest));
+    }
+
+    [Fact]
+    public void PresentCategories_on_empty_digest_is_empty()
+    {
+        Digest digest = new() { GeneratedAt = When };
+
+        Assert.Empty(DigestFilter.PresentCategories(digest));
     }
 }

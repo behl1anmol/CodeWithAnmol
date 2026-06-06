@@ -1,7 +1,7 @@
 # Checkpoint — P4: Blazor UI (live progress, real refresh, category/tag filter)
 
 **Prompt:** P4 (`../prompts/mvp-completion-prompts.md`) · **Prereq:** P2 ✅ + P3 ✅ ·
-**Result:** 174 passed, 0 failed; Core + Web build 0 warn / 0 err.
+**Result:** 195 passed, 0 failed; Core + Web build 0 warn / 0 err (after PR #11 review follow-up).
 **Branch:** `feat/p3-sequential-editorial-workflow`.
 
 ## What it does
@@ -48,6 +48,24 @@ the component (docs §2.6).
 - Manual app run **not** performed — needs a live Ollama/OpenRouter provider; the error path renders a
   friendly message until one is configured. Pure logic fully covered by `DigestFilterTests`.
 - `docs/` untouched — P4 changes only UI wiring, no operator instructions or contracts.
+
+## Review follow-up (PR #11)
+caveman-review left 5 nits + 1 question; all addressed:
+- **`rel="noopener noreferrer"`** on the `target="_blank"` item links (reverse-tabnabbing hygiene).
+- **Category picker shows only present categories** — new pure `DigestFilter.PresentCategories(digest)`
+  (taxonomy display order, intersected with sections present) replaces the full `Taxonomy.Categories`
+  list, so the dropdown never offers a category that renders empty.
+- **`DistinctTags` ordering** changed `OrderBy(Ordinal)` → `OrderBy(OrdinalIgnoreCase)` to match the
+  case-insensitive dedupe (so `"agents"` sorts before `"CVE"` in the picker).
+- **`view` computed once per render** via a top-level `@{ }` block (the `View` computed property,
+  which re-ran `Apply` twice per render, was removed).
+- **Cancellation** — component now `@implements IDisposable`, owns a `CancellationTokenSource`, passes
+  its token to `RefreshDigestAsync`, swallows `OperationCanceledException`, and cancels+disposes in
+  `Dispose` so a refresh can't outlive the page.
+- Question (tag picker lists all tags regardless of selected category): **deliberate for MVP** — the
+  "No items match the current filter." empty state is the signal; coupling the tag list to the selected
+  category is deferred.
+- Tests: `DistinctTags` ordering test strengthened with a mixed-case tag; +2 `PresentCategories` tests.
 
 ## Next
 Remaining: **P5** (model-provider health check — independent), **P6** (AppHost Ollama model
