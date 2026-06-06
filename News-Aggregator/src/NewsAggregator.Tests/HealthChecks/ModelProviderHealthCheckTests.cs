@@ -128,10 +128,39 @@ public sealed class ModelProviderHealthCheckTests
     }
 
     [Fact]
+    public async Task OpenRouter_unhealthy_when_endpoint_returns_server_error()
+    {
+        // A 5xx means OpenRouter itself is degraded — reachable but not serving.
+        var handler = new FakeHttpMessageHandler(
+            _ => FakeHttpMessageHandler.Status(HttpStatusCode.ServiceUnavailable));
+        ModelProviderHealthCheck sut = BuildSut(handler, OpenRouterOptions());
+
+        HealthCheckResult result = await RunAsync(sut);
+
+        Assert.Equal(HealthStatus.Unhealthy, result.Status);
+    }
+
+    [Fact]
     public async Task OpenRouter_unhealthy_when_unreachable()
     {
         var handler = new FakeHttpMessageHandler(_ => throw new HttpRequestException("dns failure"));
         ModelProviderHealthCheck sut = BuildSut(handler, OpenRouterOptions());
+
+        HealthCheckResult result = await RunAsync(sut);
+
+        Assert.Equal(HealthStatus.Unhealthy, result.Status);
+    }
+
+    // ---- totality -----------------------------------------------------------
+
+    [Fact]
+    public async Task Unhealthy_when_probe_throws_unexpected_exception()
+    {
+        // Stands in for a resilience-pipeline fault (e.g. BrokenCircuitException) that is neither
+        // HttpRequestException nor a cancellation: the broadened catch must still report Unhealthy.
+        var handler = new FakeHttpMessageHandler(
+            _ => throw new InvalidOperationException("circuit broken (simulated)"));
+        ModelProviderHealthCheck sut = BuildSut(handler, OllamaOptions());
 
         HealthCheckResult result = await RunAsync(sut);
 

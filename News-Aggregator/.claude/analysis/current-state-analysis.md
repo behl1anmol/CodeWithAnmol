@@ -39,7 +39,7 @@ PATH at `~/.dotnet`. Test-count timeline: **119** (pre-P1 baseline) → **143** 
 
 ## 3. What is DONE (verified against source)
 
-Last recorded test run: **204 passed, 0 failed** (P5; timeline: 119 pre-P1 → 143 P1 → 150 P2 → 164 P3 → 183 P3-review → 195 P4 → 204 P5).
+Last recorded test run: **206 passed, 0 failed** (P5 + PR #12 review; timeline: 119 pre-P1 → 143 P1 → 150 P2 → 164 P3 → 183 P3-review → 195 P4 → 204 P5 → 206 P5-review).
 
 ### 3.1 Solution & build plumbing — ✅ complete
 - Five projects exactly (`AppHost`, `Web`, `Core`, `Infrastructure`, `Tests`) — matches docs §2.1.
@@ -93,10 +93,13 @@ Last recorded test run: **204 passed, 0 failed** (P5; timeline: 119 pre-P1 → 1
   Sections}`. `TimeProvider` injected into ctor; `TryAddSingleton(TimeProvider.System)` registered
   in `InfrastructureServiceCollectionExtensions` (additive — no `Web/Program.cs` change).
 - **Caching:** `InMemoryDigestCache`.
-- **Health (P5):** `HealthChecks/ModelProviderHealthCheck` — bounded (5 s), key-safe, GET-only
-  reachability probe of the **active** provider (Ollama `/api/tags` 200 / OpenRouter base URL); uses
-  a named `model-provider-health` client. Registered `"model-provider"` (tag `ready`) in `Program.cs`
-  → surfaced by the existing `/health`. Tests: `Tests/HealthChecks/ModelProviderHealthCheckTests.cs` (9).
+- **Health (P5):** `HealthChecks/ModelProviderHealthCheck` — bounded (5 s), key-safe, GET-only,
+  **single-shot** reachability probe of the **active** provider (Ollama `/api/tags` 2xx ⇒ Healthy;
+  OpenRouter base URL: 4xx ⇒ Healthy/routable, 5xx ⇒ Unhealthy/degraded). Total — any failure ⇒
+  Unhealthy, caller-cancel propagates. Named `model-provider-health` client opts out of the global
+  resilience handler via `RemoveAllResilienceHandlers()` (no retry backoff). Registered
+  `"model-provider"` (tag `ready`) in `Program.cs` → surfaced by the existing `/health`. Tests:
+  `Tests/HealthChecks/ModelProviderHealthCheckTests.cs` (11).
 - **DI:** `InfrastructureServiceCollectionExtensions` wires all of the above (named HTTP clients incl.
   the health-probe client, provider selection from config, agents, workflows, cache, `TimeProvider.System`).
 

@@ -68,12 +68,16 @@ public static class InfrastructureServiceCollectionExtensions
 
         services.AddSingleton<IChatClientFactory, ChatClientFactory>();
 
-        // Bounded-timeout client for the provider reachability probe (ModelProviderHealthCheck).
-        // The short Timeout caps the total probe time even under ServiceDefaults' resilience
-        // handler, so a down provider yields a fast Unhealthy. The check itself is registered
-        // in the Web composition root (Program.cs).
+        // Single-shot client for the provider reachability probe (ModelProviderHealthCheck): a 5s
+        // timeout caps the probe, and RemoveAllResilienceHandlers() opts it out of the global
+        // standard resilience handler (ServiceDefaults) so a down provider fails fast instead of
+        // burning retry backoff. The check itself is registered in the Web composition root.
+        // RemoveAllResilienceHandlers is [Experimental(EXTEXP0001)] but the documented opt-out.
+#pragma warning disable EXTEXP0001
         services.AddHttpClient(ModelProviderHealthCheck.HttpClientName,
-            static client => client.Timeout = TimeSpan.FromSeconds(5));
+                static client => client.Timeout = TimeSpan.FromSeconds(5))
+            .RemoveAllResilienceHandlers();
+#pragma warning restore EXTEXP0001
     }
 
     private static void AddAgentsAndWorkflows(this IServiceCollection services)

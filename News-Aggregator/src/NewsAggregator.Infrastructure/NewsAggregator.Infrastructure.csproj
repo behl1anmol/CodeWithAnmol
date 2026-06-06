@@ -25,6 +25,9 @@
 
   <ItemGroup Label="Sources / caching / http">
     <PackageReference Include="Microsoft.Extensions.Http" />
+    <!-- RemoveAllResilienceHandlers() opts the health-probe client out of the global
+         standard resilience handler so the probe is single-shot (no retry backoff). -->
+    <PackageReference Include="Microsoft.Extensions.Http.Resilience" />
     <PackageReference Include="System.ServiceModel.Syndication" />
     <PackageReference Include="Microsoft.Extensions.Caching.Abstractions" />
     <PackageReference Include="Microsoft.Extensions.Caching.Memory" />

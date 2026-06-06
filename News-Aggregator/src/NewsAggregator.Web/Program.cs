@@ -40,7 +40,8 @@ builder.Services.AddScoped<IDigestApplicationService, DigestApplicationService>(
 builder.Services.AddInfrastructure();
 
 // Probe the active model provider; surfaced on /health (and the Aspire dashboard) alongside
-// the ServiceDefaults "self" check. Tagged "ready" so it stays off the "live"-only /alive route.
+// the ServiceDefaults "self" check. It carries no "live" tag, so it is excluded from the
+// liveness-only /alive route; "ready" is a conventional readiness marker (no route filters on it yet).
 builder.Services.AddHealthChecks()
     .AddCheck<ModelProviderHealthCheck>("model-provider", tags: ["ready"]);
 

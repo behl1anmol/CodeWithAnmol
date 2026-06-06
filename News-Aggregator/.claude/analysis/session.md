@@ -393,5 +393,23 @@ already describe the probe as a present-tense feature (now true; no operator-ste
   needs the standalone `…HealthChecks.Abstractions` package to implement it.
 - **OpenRouter probe = reachability only**: status code is intentionally ignored (401/404 still
   prove routability) so the check never needs the BYOK key and never requires a real completion.
-- The named health client's 5 s `HttpClient.Timeout` is what bounds the probe; `ConfigureHttpClientDefaults`
-  (resilience) still applies, but the client-level timeout caps total time → fast Unhealthy.
+- The probe client is **single-shot**: `RemoveAllResilienceHandlers()` opts it out of the global
+  standard resilience handler (`ConfigureHttpClientDefaults`) so it never retries, and a 5 s
+  `HttpClient.Timeout` caps it.
+
+### PR #12 — caveman-review fixes (6 findings, none blocking)
+1. **🟡 OpenRouter 5xx ⇒ Unhealthy** — was `Healthy` on *any* response; now `(int)StatusCode >= 500`
+   ⇒ Unhealthy (provider degraded), 4xx still Healthy (routable). Symmetric-ish with Ollama.
+2. **🟡 catch broadened** — the two specific catches (`HttpRequestException` + bounded
+   `TaskCanceledException`) → one `catch (Exception ex) when (!cancellationToken.IsCancellationRequested)`
+   so a resilience-pipeline fault / `UriFormatException` also yields Unhealthy; genuine caller
+   cancel still propagates.
+3. **🔵 probe client single-shot** — added `Microsoft.Extensions.Http.Resilience` to Infrastructure
+   and `.RemoveAllResilienceHandlers()` on the named client (no retry backoff; the comment's "fast"
+   is now true). API is `[Experimental(EXTEXP0001)]` → suppressed locally with `#pragma` wrapping
+   the whole statement (the diagnostic attaches to the statement-start line, so the `disable` must
+   precede `services.AddHttpClient`, not sit mid-chain).
+4. **🔵 nits** — OpenRouter endpoint `TrimEnd('/')` for parity with Ollama; `"ready"`-tag comment
+   reworded (the **absence of `"live"`**, not the `"ready"` tag, is what excludes it from `/alive`).
+5. New tests: OpenRouter 503 ⇒ Unhealthy; unexpected-exception (stands in for a circuit-breaker
+   fault) ⇒ Unhealthy. **206 passed, 0 failed** (was 204). Infra + Web build **0/0**.

@@ -43,15 +43,13 @@ public sealed class ModelProviderHealthCheck : IHealthCheck
                 _ => HealthCheckResult.Unhealthy($"Unsupported model provider '{_options.Provider}'."),
             };
         }
-        catch (HttpRequestException ex)
+        catch (Exception ex) when (!cancellationToken.IsCancellationRequested)
         {
-            // Connection refused / DNS failure / etc. — the provider is unreachable.
-            // The message carries no secret (the key never goes on the request).
-            return HealthCheckResult.Unhealthy(DescribeUnreachable(), ex);
-        }
-        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
-        {
-            // The bounded client timeout elapsed (not a caller cancellation) → unreachable.
+            // Any probe failure marks the provider unreachable: transport (HttpRequestException),
+            // the bounded client timeout (TaskCanceledException), a malformed endpoint
+            // (UriFormatException), or a resilience-pipeline fault. Genuine caller cancellation
+            // (the token is signalled) is excluded by the filter and propagates. The message
+            // carries no secret — the API key never goes on the request.
             return HealthCheckResult.Unhealthy(DescribeUnreachable(), ex);
         }
     }
@@ -72,13 +70,16 @@ public sealed class ModelProviderHealthCheck : IHealthCheck
 
     private async Task<HealthCheckResult> ProbeOpenRouterAsync(HttpClient client, CancellationToken ct)
     {
-        // Reachability only: any HTTP response (even 401/404) proves the endpoint is
-        // routable. We send no Authorization header, so the API key never leaves config
-        // and a real completion is never requested.
-        string endpoint = _options.OpenRouter.Endpoint;
+        // Reachability check: we send no Authorization header, so the API key never leaves
+        // config and a real completion is never requested. A 4xx (401/404) still proves the
+        // endpoint is routable ⇒ Healthy; a 5xx means the provider itself is degraded ⇒ Unhealthy.
+        string endpoint = _options.OpenRouter.Endpoint.TrimEnd('/');
 
         using HttpResponseMessage response = await client.GetAsync(endpoint, ct);
-        return HealthCheckResult.Healthy($"OpenRouter endpoint reachable at {endpoint}.");
+        return (int)response.StatusCode >= 500
+            ? HealthCheckResult.Unhealthy(
+                $"OpenRouter at '{endpoint}' returned {(int)response.StatusCode} ({response.StatusCode}).")
+            : HealthCheckResult.Healthy($"OpenRouter endpoint reachable at {endpoint}.");
     }
 
     private string DescribeUnreachable() => _options.Provider switch
