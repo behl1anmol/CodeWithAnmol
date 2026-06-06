@@ -41,6 +41,7 @@ match each other.
 | --- | --- |
 | `Aspire.Hosting.AppHost` | `13.4.2` |
 | `Aspire.AppHost.Sdk` (msbuild SDK in `global.json`) | `13.4.2` |
+| `CommunityToolkit.Aspire.Hosting.Ollama` | `13.4.0` — Ollama **hosting** integration; `AddOllama(...).AddModel(...)` pulls the model on startup (P6). Hosting only — the chat client stays `OllamaSharp` in Infrastructure. |
 | `Aspire.Hosting.Redis` *(optional, not referenced — Redis deferred)* | align to the Aspire line (`13.4.x`) when added |
 | `Aspire.StackExchange.Redis.DistributedCaching` *(optional, not referenced)* | align to the Aspire line (`13.4.x`) when added |
 
@@ -57,7 +58,12 @@ match each other.
 
 > **Deprecated / not used:** `Microsoft.Extensions.AI.Ollama` (**deprecated** — the
 > official .NET AI *Chat with a local AI model* quickstart uses `OllamaSharp` instead),
-> `CommunityToolkit.Aspire.Hosting.Ollama`, `CommunityToolkit.Aspire.OllamaSharp`.
+> `CommunityToolkit.Aspire.OllamaSharp` (client toolkit — not needed; OllamaSharp is wired
+> directly in Infrastructure).
+>
+> **Updated (P6):** `CommunityToolkit.Aspire.Hosting.Ollama` **is now referenced by the
+> AppHost** for model bootstrap (`AddModel` auto-pulls). This is *hosting only*; the chat
+> client is still `OllamaSharp`. See [§6.1](06-aspire-topology-and-docker.md).
 
 ## 5.1 Package recommendations by project
 
@@ -101,12 +107,16 @@ Legend: ✅ verified name · ⚠️ verify version/exact name · ❓ uncertain (
 | --- | --- | --- |
 | `Aspire.Hosting.AppHost` | ✅ / ⚠️ ver | Aspire app model host. |
 | `Aspire.AppHost.Sdk` (SDK ref) | ✅ | Aspire AppHost build SDK. |
+| `CommunityToolkit.Aspire.Hosting.Ollama` (`13.4.0`) | ✅ | Ollama hosting + model bootstrap (`AddOllama(...).WithDataVolume().AddModel(...)`). |
 | `Aspire.Hosting.Redis` | ⚠️ ver | Optional Redis resource for distributed cache. |
 
-> **Ollama hosting** uses **first-party** Aspire only: model the Ollama runtime as a
-> generic container via `builder.AddContainer("ollama", "ollama/ollama")` (in
-> `Aspire.Hosting.AppHost`), or point config at a host-installed Ollama. **No
-> Community Toolkit package.** See [§6.1](06-aspire-topology-and-docker.md).
+> **Ollama hosting (updated P6).** The AppHost uses the **CommunityToolkit Ollama hosting
+> integration** so `AddModel("llama3.2")` pulls the model on startup and a single
+> `dotnet run` can serve a digest on the first run. The data volume persists models across
+> runs; `WaitFor(model)` gates the Web app until the pull completes. The chat **client**
+> is still `OllamaSharp` in Infrastructure (no `CommunityToolkit.Aspire.OllamaSharp`); the
+> toolkit is used only for *hosting*. Host-installed Ollama remains supported by pointing
+> `Models:Ollama:Endpoint` at it. See [§6.1](06-aspire-topology-and-docker.md).
 
 ### Tests (`NewsAggregator.Tests`)
 | Package | Status | Purpose |

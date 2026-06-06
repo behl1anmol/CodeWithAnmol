@@ -39,7 +39,7 @@ PATH at `~/.dotnet`. Test-count timeline: **119** (pre-P1 baseline) → **143** 
 
 ## 3. What is DONE (verified against source)
 
-Last recorded test run: **206 passed, 0 failed** (P5 + PR #12 review; timeline: 119 pre-P1 → 143 P1 → 150 P2 → 164 P3 → 183 P3-review → 195 P4 → 204 P5 → 206 P5-review).
+Last recorded test run: **209 passed, 0 failed** (P6; timeline: 119 pre-P1 → 143 P1 → 150 P2 → 164 P3 → 183 P3-review → 195 P4 → 204 P5 → 206 P5-review → 209 P6). **All of P1–P6 are merged → MVP Definition-of-Done (`docs/07 §7.5`) is satisfied.**
 
 ### 3.1 Solution & build plumbing — ✅ complete
 - Five projects exactly (`AppHost`, `Web`, `Core`, `Infrastructure`, `Tests`) — matches docs §2.1.
