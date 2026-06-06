@@ -39,7 +39,7 @@ PATH at `~/.dotnet`. Test-count timeline: **119** (pre-P1 baseline) → **143** 
 
 ## 3. What is DONE (verified against source)
 
-Last recorded test run: **164 passed, 0 failed** (P3, current; timeline: 119 pre-P1 → 143 P1 → 150 P2 → 164 P3).
+Last recorded test run: **206 passed, 0 failed** (P5 + PR #12 review; timeline: 119 pre-P1 → 143 P1 → 150 P2 → 164 P3 → 183 P3-review → 195 P4 → 204 P5 → 206 P5-review).
 
 ### 3.1 Solution & build plumbing — ✅ complete
 - Five projects exactly (`AppHost`, `Web`, `Core`, `Infrastructure`, `Tests`) — matches docs §2.1.
@@ -93,13 +93,21 @@ Last recorded test run: **164 passed, 0 failed** (P3, current; timeline: 119 pre
   Sections}`. `TimeProvider` injected into ctor; `TryAddSingleton(TimeProvider.System)` registered
   in `InfrastructureServiceCollectionExtensions` (additive — no `Web/Program.cs` change).
 - **Caching:** `InMemoryDigestCache`.
-- **DI:** `InfrastructureServiceCollectionExtensions` wires all of the above (named HTTP clients,
-  provider selection from config, agents, workflows, cache, `TimeProvider.System`).
+- **Health (P5):** `HealthChecks/ModelProviderHealthCheck` — bounded (5 s), key-safe, GET-only,
+  **single-shot** reachability probe of the **active** provider (Ollama `/api/tags` 2xx ⇒ Healthy;
+  OpenRouter base URL: 4xx ⇒ Healthy/routable, 5xx ⇒ Unhealthy/degraded). Total — any failure ⇒
+  Unhealthy, caller-cancel propagates. Named `model-provider-health` client opts out of the global
+  resilience handler via `RemoveAllResilienceHandlers()` (no retry backoff). Registered
+  `"model-provider"` (tag `ready`) in `Program.cs` → surfaced by the existing `/health`. Tests:
+  `Tests/HealthChecks/ModelProviderHealthCheckTests.cs` (11).
+- **DI:** `InfrastructureServiceCollectionExtensions` wires all of the above (named HTTP clients incl.
+  the health-probe client, provider selection from config, agents, workflows, cache, `TimeProvider.System`).
 
 ### 3.4 Web (`NewsAggregator.Web`) — ⚠️ scaffold + partial
 - `Program.cs` is the single composition root: Options binding with `ValidateOnStart`
   (incl. the "OpenRouter key required when provider == OpenRouter" rule), Core service
-  registration, `AddInfrastructure()`, Blazor Server, `AddServiceDefaults()`/`MapDefaultEndpoints()`.
+  registration, `AddInfrastructure()`, the `"model-provider"` health check (P5), Blazor Server,
+  `AddServiceDefaults()`/`MapDefaultEndpoints()`.
 - Blazor scaffold present (`App`, `Routes`, `MainLayout`, `Home`, `Error`, `Digest`).
 
 ### 3.5 AppHost (`NewsAggregator.AppHost`) — ⚠️ partial
@@ -130,8 +138,8 @@ Each gap below cites the file and the doc clause it satisfies. These map 1:1 ont
 | ~~G2~~ | ✅ **DONE (P1 + P3).** Enrichment prompts (Summarizer/Categorizer/Ranker) done in P1; Editor prompt refined in P3 to strict minified JSON (category→intro). | `Agents/AgentInstructions.cs` | §3.2, §3.3 | **P1** ✅ + **P3** ✅ |
 | ~~G3~~ | ✅ **DONE (P2).** `ConcurrentEnrichmentWorkflow.EnrichAsync` implemented — per-article fan-out ∥ via `AgentWorkflowBuilder.BuildConcurrent`; merge via `EnrichedItemAssembler`; bounded parallelism + `Task.WhenAll`; cancellation rethrown. (commits 122e25a + 37d71f9, PR #9) | `Workflows/ConcurrentEnrichmentWorkflow.cs` | §3.3 | **P2** ✅ |
 | ~~G4~~ | ✅ **DONE (P3).** `SequentialEditorialWorkflow.ComposeAsync` implemented — `DigestComposer` → Editor agent streaming → `EditorIntroParser` → `Digest`. `TimeProvider` injected. New `DigestComposer` + `EditorIntroParser` in Core (BCL-only). | `Workflows/SequentialEditorialWorkflow.cs` | §3.4 | **P3** ✅ |
-| G5 | **UI does not stream live progress, still catches the scaffold exception, and has no category/tag filtering.** | `Components/Pages/Digest.razor` (`catch (NotImplementedException)`) | §1.3 (filter), §1.5/§2.4 (live progress) | **P4** |
-| G6 | **No model-provider health check / startup reachability check.** | — (missing) | §5.3, §6.2 | **P5** |
+| ~~G5~~ | ✅ **DONE (P4, PR #11).** `Digest.razor` drives a real refresh, streams live `AgentProgress` over Blazor Server, removed the scaffold `catch`, and filters by category/tag via a pure unit-tested `DigestFilter`. | `Components/Pages/Digest.razor` + `DigestFilter` | §1.3, §1.5/§2.4 | **P4** ✅ |
+| ~~G6~~ | ✅ **DONE (P5).** `Infrastructure/HealthChecks/ModelProviderHealthCheck.cs` probes the active provider (Ollama `/api/tags` 200 / OpenRouter base reachability), key-safe, bounded 5 s; registered `"model-provider"` (tag `ready`) in `Program.cs`, surfaced by the existing `/health`. | `HealthChecks/ModelProviderHealthCheck.cs` | §5.3, §6.2 | **P5** ✅ |
 | G7 | **AppHost never makes the Ollama model available**, so a single `dotnet run` cannot actually produce a digest (container starts with no model pulled). | `AppHost/AppHost.cs` | §1.7, §6.1, §7.5 ("single `dotnet run`") | **P6** |
 | G8 | **No workflow smoke/integration test** (DoD requires one). | `Tests/` (absent) | §7.5 | **P6** |
 
@@ -150,8 +158,8 @@ Walking `docs/07 §7.5` line by line:
    + workflow unit tests **done** (164 passing); the end-to-end smoke test is **G8** (**P6**).
 6. *"Every Agent Framework/Aspire package version pinned and aligned"* → **done** (3.1).
 
-Remaining gap to MVP DoD: **P4** (Blazor UI), **P5** (health check — independent), **P6** (AppHost
-model bootstrap + end-to-end smoke test). After P6, §7.5 is fully satisfied.
+Remaining gap to MVP DoD: **P6** (AppHost model bootstrap + end-to-end smoke test) only — **P4** ✅
+and **P5** ✅ are done. After P6, §7.5 is fully satisfied.
 
 ---
 
@@ -160,8 +168,8 @@ model bootstrap + end-to-end smoke test). After P6, §7.5 is fully satisfied.
 ```
 P1 ✅ (enrichment contract + Core mapper + enrichment prompts)
  ├─> P2 ✅ (Concurrent enrichment workflow)
- └─> P3 ✅ (Sequential editorial workflow)     P5 (provider health check)  ── independent
-            P2 ✅, P3 ✅ ──> P4 (Blazor: progress + real refresh + filtering)
+ └─> P3 ✅ (Sequential editorial workflow)     P5 ✅ (provider health check)  ── independent
+            P2 ✅, P3 ✅ ──> P4 ✅ (Blazor: progress + real refresh + filtering)
             P2 ✅, P3 ✅ ──> P6 (AppHost model bootstrap + end-to-end smoke test)
 ```
 
@@ -169,8 +177,9 @@ P1 ✅ (enrichment contract + Core mapper + enrichment prompts)
 - **P2 ✅ done** — `ConcurrentEnrichmentWorkflow` implemented (commits 122e25a + 37d71f9, PR #9).
 - **P3 ✅ done** — `SequentialEditorialWorkflow` implemented; `DigestComposer` + `EditorIntroParser`
   added to Core; Editor prompt refined; `TimeProvider` injected.
-- **P4 and P6 depend on P2+P3** because they need an end-to-end digest to render / smoke-test.
-- **P5 (health check) is fully independent** — it can be built at any time.
+- **P4 ✅ done** — Blazor live progress + real refresh + category/tag filtering (PR #11).
+- **P5 ✅ done** — model-provider health check (independent; this session).
+- **P6 depends on P2+P3** because it needs an end-to-end digest to smoke-test.
 
 Each prompt's "Definition of Done" requires the **full** suite (existing + new) to stay green, so
 the system never regresses between steps and we avoid an enhancement/bug-fix loop (constraint F).

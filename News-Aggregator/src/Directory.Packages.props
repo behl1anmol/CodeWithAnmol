@@ -46,6 +46,9 @@
     -->
     <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.6.0" />
     <PackageVersion Include="Microsoft.Extensions.Http" Version="10.0.8" />
+    <!-- IHealthCheck/HealthCheckResult for the model-provider probe (Infrastructure).
+         Same assembly the AspNetCore shared framework ships at 10.0.8 → unifies in Web. -->
+    <PackageVersion Include="Microsoft.Extensions.Diagnostics.HealthChecks.Abstractions" Version="10.0.8" />
     <PackageVersion Include="Microsoft.Extensions.Http.Resilience" Version="10.6.0" />
     <PackageVersion Include="Microsoft.Extensions.Caching.Abstractions" Version="10.0.8" />
     <PackageVersion Include="Microsoft.Extensions.Caching.Memory" Version="10.0.8" />
