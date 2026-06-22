@@ -150,8 +150,10 @@ caching will plug in — without referencing a single vendor SDK."
 
 **Learning objectives:**
 - Define the Core **ports**: `INewsSource`, `INewsAggregationService`, `IChatModelProvider`,
-  `IAgentFactory`'s Core-facing view, `IEnrichmentWorkflow`, `IEditorialWorkflow`, `IDigestCache`,
-  `IDigestApplicationService`.
+  `IEnrichmentWorkflow`, `IEditorialWorkflow`, `IDigestCache`, `IDigestApplicationService`.
+  (Note: the **agent factory is *not* a Core port** — `IAgentFactory` returns the framework type
+  `Microsoft.Agents.AI.AIAgent`, so it lives in **Infrastructure** and arrives in Ep 9. Core sees
+  the AI layer only through the two *workflow* ports, `IEnrichmentWorkflow`/`IEditorialWorkflow`.)
 - Write `DigestApplicationService` to *orchestrate* collect → enrich → compose → cache, depending
   only on ports.
 - Stream progress with `IProgress<AgentProgress>` (a BCL type) — the seam the UI uses later.

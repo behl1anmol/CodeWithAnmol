@@ -136,12 +136,14 @@ Ranker *concurrently* — and I'll show you the one-line gotcha that makes the w
 miss it."
 
 **Learning objectives:**
-- Build a **fan-out/fan-in** workflow with `AgentWorkflowBuilder.BuildConcurrent(agents, aggregator)`.
+- Build a **fan-out/fan-in** workflow with `AgentWorkflowBuilder.BuildConcurrent(agents)` — **no
+  aggregator delegate** (we'll see *why* below).
 - Drive it: `InProcessExecution.RunStreamingAsync` + `run.WatchStreamAsync()`.
 - The **`TurnToken` gotcha** — agents only respond after `run.TrySendMessageAsync(new
   TurnToken(emitEvents: true))`; without it the workflow sits `Idle` forever.
-- Stream `AgentResponseUpdateEvent` → `IProgress<AgentProgress>` for live UI later; take the result
-  from `WorkflowOutputEvent`; merge via the **Ep 10 assembler** in the aggregator.
+- Stream `AgentResponseUpdateEvent` → `IProgress<AgentProgress>` for live UI; **route each update to
+  its role by `ExecutorId` (== the agent's `AIAgent.Id`)** into per-role text buffers, then call the
+  **Ep 10 assembler** *after* the stream completes (reply order isn't guaranteed).
 - Bound **cross-article** parallelism with `SemaphoreSlim` (don't rely on `BuildConcurrent` to
   parallelize across articles — it parallelizes the agent set over *one* input).
 
@@ -149,21 +151,31 @@ miss it."
 → `end-ep11`.
 
 **Talk segment.** The fan-out/fan-in (scatter-gather) pattern (`docs/03 §3.3`): all three agents get
-the *same* article; the optional `aggregator`
-`Func<IList<List<ChatMessage>>, List<ChatMessage>>` reduces their replies. Crucially, the aggregator
-does **no parsing** — it pulls each agent's last message text and calls the Ep 10
-`EnrichedItemAssembler`. Then the **batching note**: to process many articles, the workflow loops
+the *same* article and run concurrently. `BuildConcurrent` *does* expose an optional `aggregator`
+delegate (`Func<IList<List<ChatMessage>>, List<ChatMessage>>`) — and this is the perfect
+**verify-the-API** beat for the episode: when you exercise it against the installed 1.9.0, you find
+the aggregator's **message order isn't guaranteed**, so you can't reliably tell the summary from the
+category from the score inside it. So the shipped workflow takes the robust path instead — call
+`BuildConcurrent([summarizer, categorizer, ranker])` *without* an aggregator, **route each streamed
+`AgentResponseUpdateEvent` to its role by `ExecutorId` (== the producing agent's `AIAgent.Id`)** into
+per-role text buffers, and call the Ep 10 `EnrichedItemAssembler` **after** the stream finishes,
+keeping all parsing in Core. Then the **batching note**: to process many articles, the workflow loops
 articles under a `SemaphoreSlim(MaxDegreeOfParallelism)` with `Task.WhenAll` (the same bounded
 pattern as the sources), preserving input order.
 
 **Hands-on build (in order):**
-1. `Infrastructure/Workflows/ConcurrentEnrichmentWorkflow.cs` — for each `NewsItem`: build the agent
-   set from the factory; `AgentWorkflowBuilder.BuildConcurrent([summarizer, categorizer, ranker])`;
+1. `Infrastructure/Workflows/ConcurrentEnrichmentWorkflow.cs` — for each `NewsItem`: resolve the
+   three role agents from the factory and build a `Dictionary<string, AgentRole>` mapping each
+   agent's `Id` → its role, plus a per-role `StringBuilder` buffer;
+   `AgentWorkflowBuilder.BuildConcurrent([summarizer, categorizer, ranker])` (**no aggregator**);
    `input = [new ChatMessage(ChatRole.User, BuildPrompt(item))]`;
    `await using var run = await InProcessExecution.RunStreamingAsync(wf, input, ct)`;
    **`await run.TrySendMessageAsync(new TurnToken(emitEvents: true))`**; consume
-   `WatchStreamAsync()` — on `AgentResponseUpdateEvent` report progress (route replies by
-   `AIAgent.Id`), on `WorkflowOutputEvent` collect the result; merge via the assembler.
+   `WatchStreamAsync()` — for each `AgentResponseUpdateEvent`, look up the role via
+   `update.ExecutorId`, append `update.Update?.Text` to that role's buffer, and report progress.
+   **After** the loop, `cancellationToken.ThrowIfCancellationRequested()` (the stream ends *without*
+   throwing on cancel), then call `EnrichedItemAssembler.Assemble(item, summary, category, ranker)`
+   from the buffers.
 2. Wrap the per-article run in the bounded `SemaphoreSlim` + `Task.WhenAll` (index-ordered →
    deterministic output order).
 3. `Tests/Fakes/FakeAgentFactory.cs` (agents backed by `FakeChatClient` with role-specific canned
