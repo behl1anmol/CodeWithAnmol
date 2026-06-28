@@ -61,6 +61,7 @@ accompanied by an alternative. Use the legend below throughout the docs:
 5. [Packages & Configuration Strategy](05-packages-and-configuration.md)
 6. [Aspire Topology & Docker Strategy](06-aspire-topology-and-docker.md)
 7. [SOLID, Tradeoffs & Roadmap](07-solid-tradeoffs-and-roadmap.md)
+8. [Local Secrets & Aspire Config Wiring](08-local-secrets-and-aspire-config-wiring.md)
 
 ---
 
